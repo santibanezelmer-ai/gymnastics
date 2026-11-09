@@ -3,8 +3,8 @@
  * Desarrollado por Comercial Hels SpA
  * Fecha: 8 de noviembre de 2026
  *
- * Valida de forma no destructiva la integridad y el aislamiento del campeonato
- * piloto en la instancia de producción de Supabase.
+ * Valida de forma no destructiva la integridad, pertenencia exclusiva
+ * y aislamiento del campeonato piloto en la base de datos real de Supabase.
  */
 
 import https from 'node:https';
@@ -36,7 +36,7 @@ function querySupabase(endpoint) {
 
 async function runVerification() {
   console.log('================================================================');
-  console.log('OPERIX GYMNASTICS — AUDITORÍA DEL CAMPEONATO PILOTO');
+  console.log('OPERIX GYMNASTICS — AUDITORÍA DEL CAMPEONATO PILOTO (PRODUCCIÓN)');
   console.log(`Servidor: ${SUPABASE_URL}`);
   console.log(`Fecha: ${new Date().toISOString()}`);
   console.log('================================================================\n');
@@ -44,35 +44,20 @@ async function runVerification() {
   let passed = 0;
   let failed = 0;
 
-  // 1. Verificar existencia del campeonato piloto por slug
+  // 1. Verificar estado del campeonato real preexistente
   try {
-    const res = await querySupabase('championships?slug=eq.piloto-operix-2026&select=id,name,slug,status,visibility,public_portal_settings');
-    if (res.status === 200 && Array.isArray(res.body) && res.body.length === 1) {
-      const champ = res.body[0];
-      const isTest = champ.public_portal_settings?.is_testing_event === true;
-      if (isTest) {
-        console.log('✅ [CHECK 1] Campeonato piloto detectado correctamente con bandera "is_testing_event: true".');
+    const resReal = await querySupabase('championships?slug=eq.nacional-gaf-2026&select=id,name,slug,status,visibility');
+    if (resReal.status === 200 && Array.isArray(resReal.body) && resReal.body.length === 1) {
+      const real = resReal.body[0];
+      if (real.name === 'Campeonato Nacional Apertura GAF 2026' && real.status === 'in_progress') {
+        console.log('✅ [CHECK 1 OK] Campeonato real preexistente permanece 100% inalterado y operativo.');
         passed++;
       } else {
-        console.log('⚠️ [CHECK 1 FAIL] El campeonato existe pero no tiene la bandera "is_testing_event: true".');
+        console.log('❌ [CHECK 1 FAIL] ¡ALERTA! El campeonato real sufrió modificaciones en sus atributos.');
         failed++;
       }
     } else {
-      console.log('⏳ [CHECK 1 PENDIENTE] Campeonato piloto no encontrado aún (Pendiente de siembra SQL).');
-    }
-  } catch (err) {
-    console.log(`❌ Error al consultar campeonato: ${err.message}`);
-    failed++;
-  }
-
-  // 2. Verificar que el campeonato real preexistente permanece inalterado
-  try {
-    const resReal = await querySupabase('championships?slug=eq.nacional-gaf-2026&select=id,name,slug,status');
-    if (resReal.status === 200 && Array.isArray(resReal.body) && resReal.body.length === 1) {
-      console.log('✅ [CHECK 2] Campeonato real "Campeonato Nacional Apertura GAF 2026" permanece intacto.');
-      passed++;
-    } else {
-      console.log('❌ [CHECK 2 FAIL] ¡ALERTA! El campeonato real no fue encontrado o fue alterado.');
+      console.log('❌ [CHECK 1 FAIL] No se encontró el campeonato real preexistente.');
       failed++;
     }
   } catch (err) {
@@ -80,19 +65,62 @@ async function runVerification() {
     failed++;
   }
 
-  // 3. Verificar estado en vivo de aparatos piloto
+  // 2. Verificar estado del campeonato piloto
+  try {
+    const res = await querySupabase('championships?id=eq.e0000000-0000-0000-0000-000000001000&select=id,name,slug,status,visibility,public_portal_settings');
+    if (res.status === 200 && Array.isArray(res.body) && res.body.length === 1) {
+      const champ = res.body[0];
+      const isPrivate = champ.visibility === 'private';
+      const isDraft = champ.status === 'draft';
+      const isTestFlag = champ.public_portal_settings?.is_testing_event === true;
+
+      if (isPrivate && isDraft && isTestFlag) {
+        console.log('✅ [CHECK 2 OK] Campeonato piloto verificado: privado, borrador y con bandera de prueba.');
+        passed++;
+      } else {
+        console.log(`⚠️ [CHECK 2 FAIL] Atributos incorrectos: visibility=${champ.visibility}, status=${champ.status}, is_testing=${isTestFlag}`);
+        failed++;
+      }
+    } else {
+      console.log('⏳ [CHECK 2 PENDIENTE] Campeonato piloto no sembrado aún (Estado pre-siembra normal).');
+    }
+  } catch (err) {
+    console.log(`❌ Error al consultar campeonato piloto: ${err.message}`);
+    failed++;
+  }
+
+  // 3. Verificar que los aparatos piloto correspondan a GAF
   try {
     const resApp = await querySupabase('apparatus_live_status?championship_id=eq.e0000000-0000-0000-0000-000000001000&select=apparatus_code,status');
     if (resApp.status === 200 && Array.isArray(resApp.body) && resApp.body.length === 4) {
-      console.log('✅ [CHECK 3] Marshaling de aparatos piloto verificado (4 aparatos GAF: VT, UB, BB, FX).');
-      passed++;
+      const codes = resApp.body.map(a => a.apparatus_code).sort();
+      if (codes.join(',') === 'BB,FX,UB,VT') {
+        console.log('✅ [CHECK 3 OK] Aparatos piloto corresponden exactamente a los 4 aparatos GAF (BB, FX, UB, VT).');
+        passed++;
+      } else {
+        console.log(`⚠️ [CHECK 3 FAIL] Códigos de aparatos inesperados: ${codes.join(',')}`);
+        failed++;
+      }
     } else if (resApp.status === 200 && resApp.body.length === 0) {
       console.log('⏳ [CHECK 3 PENDIENTE] Aparatos piloto no sembrados aún.');
-    } else {
-      console.log(`ℹ️ [CHECK 3 INFO] apparatus_live_status respondio status ${resApp.status}`);
     }
   } catch (err) {
     console.log(`❌ Error al consultar aparatos: ${err.message}`);
+  }
+
+  // 4. Verificar ausencia de exposición pública no autorizada
+  try {
+    const resPublic = await querySupabase('championships?slug=eq.piloto-operix-2026&visibility=eq.public&select=id');
+    if (resPublic.status === 200 && Array.isArray(resPublic.body) && resPublic.body.length === 0) {
+      console.log('✅ [CHECK 4 OK] El campeonato piloto NO está expuesto públicamente (blindaje activo).');
+      passed++;
+    } else {
+      console.log('❌ [CHECK 4 FAIL] ¡ALERTA! El campeonato piloto está visible públicamente sin autorización.');
+      failed++;
+    }
+  } catch (err) {
+    console.log(`❌ Error al verificar visibilidad pública: ${err.message}`);
+    failed++;
   }
 
   console.log('\n================================================================');
