@@ -1,77 +1,155 @@
 -- ==============================================================================
--- OPERIX GYMNASTICS — SEED SCRIPT: CAMPEONATO PILOTO EN PRODUCCIÓN (2026)
--- Versión Corregida y Blindada — Sin "ON CONFLICT DO UPDATE"
+-- OPERIX GYMNASTICS — SEED SCRIPT DEFINITIVO: CAMPEONATO PILOTO EN PRODUCCIÓN (2026)
+-- Versión Auditada: Preflight Total de UUIDs, Cero "DO UPDATE", Plan Gratuito/Trial,
+-- PIN Criptográfico Dinámico y Visibilidad Privada Inicial
 -- Desarrollado por Comercial Hels SpA
 -- Fecha: 8 de noviembre de 2026
 --
--- GARANTÍAS DE SEGURIDAD ESTRICTA:
--- 1. CERO "ON CONFLICT DO UPDATE": No puede modificar ningún registro existente.
--- 2. Pre-flight checks exhaustivos: Si cualquier UUID o Slug ya existe y no pertenece
---    inequívocamente al piloto, la transacción se aborta de inmediato con ROLLBACK.
--- 3. Idempotencia pura: La segunda ejecución no produce cambios ni errores (DO NOTHING).
--- 4. Visibilidad inicial privada y estado borrador (visibility = 'private', status = 'draft').
--- 5. Generación de PIN de alta entropía en tiempo de ejecución (gen_random_bytes).
--- 6. Validación reglamentaria de edades FIG Junior GAF (13 a 15 años en 2026).
--- 7. Resolución dinámica de IDs de aparatos oficiales GAF en la base de datos real.
+-- GARANTÍAS DE SEGURIDAD Y AISLAMIENTO:
+-- 1. Preflight Total: Valida previamente cada uno de los UUIDs, slugs y códigos únicos.
+--    Si cualquiera ya existe y no pertenece inequívocamente al piloto, la transacción se aborta.
+-- 2. "ON CONFLICT DO NOTHING" estrictamente protegido contra ocultamiento de colisiones.
+-- 3. Organización en "free" / "trial" sin ningún privilegio comercial ni plan Enterprise.
+-- 4. Campeonato creado como PRIVADO y en BORRADOR (visibility='private', status='draft').
+-- 5. PIN de juez de alta entropía generado criptográficamente en tiempo de ejecución.
+-- 6. Conformidad estricta FIG Junior GAF (Reg. Técnico FIG Art. 5.2: 14 y 15 años en 2026).
+-- 7. Resolución dinámica de IDs oficiales de aparatos GAF en la base de datos real.
 -- ==============================================================================
 
 BEGIN;
 
 -- ------------------------------------------------------------------------------
--- 1. PRE-FLIGHT CHECKS: VALIDACIÓN ESTRICTA DE UUIDs, SLUGS Y RELACIONES
+-- 1. PRE-FLIGHT CHECKS: VALIDACIÓN EXHAUSTIVA DE UUIDs, SLUGS Y REGLAS DE INTEGRIDAD
 -- ------------------------------------------------------------------------------
 DO $$
 DECLARE
-    v_champ_id UUID := 'e0000000-0000-0000-0000-000000001000'::uuid;
-    v_org_id   UUID := 'e0000000-0000-0000-0000-000000000001'::uuid;
-    v_club_a   UUID := 'e0000000-0000-0000-0000-000000000010'::uuid;
-    v_club_b   UUID := 'e0000000-0000-0000-0000-000000000020'::uuid;
-    v_cat_id   UUID := 'e0000000-0000-0000-0000-000000002001'::uuid;
-    v_existing_slug TEXT;
-    v_existing_id   UUID;
+    -- Identificadores canónicos sintéticos del piloto
+    v_org_id      UUID := 'e0000000-0000-0000-0000-000000000001'::uuid;
+    v_club_a      UUID := 'e0000000-0000-0000-0000-000000000010'::uuid;
+    v_club_b      UUID := 'e0000000-0000-0000-0000-000000000020'::uuid;
+    v_gym_1       UUID := 'e0000000-0000-0000-0000-000000000101'::uuid;
+    v_gym_2       UUID := 'e0000000-0000-0000-0000-000000000102'::uuid;
+    v_gym_3       UUID := 'e0000000-0000-0000-0000-000000000201'::uuid;
+    v_gym_4       UUID := 'e0000000-0000-0000-0000-000000000202'::uuid;
+    v_champ_id    UUID := 'e0000000-0000-0000-0000-000000001000'::uuid;
+    v_cat_id      UUID := 'e0000000-0000-0000-0000-000000002001'::uuid;
+    v_reg_1       UUID := 'e0000000-0000-0000-0000-000000003001'::uuid;
+    v_reg_2       UUID := 'e0000000-0000-0000-0000-000000003002'::uuid;
+    v_reg_3       UUID := 'e0000000-0000-0000-0000-000000003003'::uuid;
+    v_reg_4       UUID := 'e0000000-0000-0000-0000-000000003004'::uuid;
+    v_sched_1     UUID := 'e0000000-0000-0000-0000-000000004001'::uuid;
+    v_rot_1       UUID := 'e0000000-0000-0000-0000-000000005001'::uuid;
+    v_rot_2       UUID := 'e0000000-0000-0000-0000-000000005002'::uuid;
+    v_live_vt     UUID := 'e0000000-0000-0000-0000-000000006001'::uuid;
+    v_live_ub     UUID := 'e0000000-0000-0000-0000-000000006002'::uuid;
+    v_live_bb     UUID := 'e0000000-0000-0000-0000-000000006003'::uuid;
+    v_live_fx     UUID := 'e0000000-0000-0000-0000-000000006004'::uuid;
+    v_awards_cfg  UUID := 'e0000000-0000-0000-0000-000000007001'::uuid;
+
+    v_temp_id     UUID;
+    v_temp_text   TEXT;
 BEGIN
-    -- 1.1 Validar que la organización piloto no colisione con otra organización real
-    SELECT id, slug INTO v_existing_id, v_existing_slug
-    FROM public.organizations
-    WHERE id = v_org_id OR slug = 'fed-piloto-operix'
-    LIMIT 1;
-
-    IF v_existing_id IS NOT NULL THEN
-        IF v_existing_id <> v_org_id OR v_existing_slug <> 'fed-piloto-operix' THEN
-            RAISE EXCEPTION 'PRE-FLIGHT ABORT: Conflicto en organizaciones. ID % o Slug % ya existe y no coincide con el piloto.', v_existing_id, v_existing_slug;
-        END IF;
+    -- 1.1 Organización: ID y Slug
+    SELECT id, slug INTO v_temp_id, v_temp_text FROM public.organizations WHERE id = v_org_id OR slug = 'fed-piloto-operix' LIMIT 1;
+    IF v_temp_id IS NOT NULL AND (v_temp_id <> v_org_id OR v_temp_text <> 'fed-piloto-operix') THEN
+        RAISE EXCEPTION 'PRE-FLIGHT ABORT: Conflicto en organizaciones. ID % o Slug % no pertenece al piloto.', v_temp_id, v_temp_text;
     END IF;
 
-    -- 1.2 Validar que el campeonato piloto no colisione con otro torneo real
-    SELECT id, slug INTO v_existing_id, v_existing_slug
-    FROM public.championships
-    WHERE id = v_champ_id OR slug = 'piloto-operix-2026'
-    LIMIT 1;
-
-    IF v_existing_id IS NOT NULL THEN
-        IF v_existing_id <> v_champ_id OR v_existing_slug <> 'piloto-operix-2026' THEN
-            RAISE EXCEPTION 'PRE-FLIGHT ABORT: Conflicto en campeonatos. ID % o Slug % ya existe y no pertenece al piloto.', v_existing_id, v_existing_slug;
-        END IF;
+    -- 1.2 Campeonato: ID y Slug
+    SELECT id, slug INTO v_temp_id, v_temp_text FROM public.championships WHERE id = v_champ_id OR slug = 'piloto-operix-2026' LIMIT 1;
+    IF v_temp_id IS NOT NULL AND (v_temp_id <> v_champ_id OR v_temp_text <> 'piloto-operix-2026') THEN
+        RAISE EXCEPTION 'PRE-FLIGHT ABORT: Conflicto en campeonatos. ID % o Slug % no pertenece al piloto.', v_temp_id, v_temp_text;
     END IF;
 
-    -- 1.3 Validar que los clubes no colisionen con códigos o IDs externos
+    -- 1.3 Clubes: IDs y Códigos únicos
     IF EXISTS (
         SELECT 1 FROM public.clubs
         WHERE (id = v_club_a AND code <> 'AND-PILOT')
            OR (id = v_club_b AND code <> 'OLI-PILOT')
-           OR (code IN ('AND-PILOT', 'OLI-PILOT') AND id NOT IN (v_club_a, v_club_b))
+           OR (code = 'AND-PILOT' AND id <> v_club_a)
+           OR (code = 'OLI-PILOT' AND id <> v_club_b)
     ) THEN
-        RAISE EXCEPTION 'PRE-FLIGHT ABORT: Conflicto en clubes ficticios. Uno de los códigos o IDs ya existe y no pertenece al piloto.';
+        RAISE EXCEPTION 'PRE-FLIGHT ABORT: Conflicto en clubes ficticios (AND-PILOT / OLI-PILOT).';
     END IF;
 
-    -- 1.4 Validar que los 4 aparatos GAF existan en la tabla base
+    -- 1.4 Gimnastas: IDs y Documentos de prueba
+    IF EXISTS (
+        SELECT 1 FROM public.gymnasts
+        WHERE (id = v_gym_1 AND rut_or_id <> 'TEST-AND-01')
+           OR (id = v_gym_2 AND rut_or_id <> 'TEST-AND-02')
+           OR (id = v_gym_3 AND rut_or_id <> 'TEST-OLI-03')
+           OR (id = v_gym_4 AND rut_or_id <> 'TEST-OLI-04')
+           OR (rut_or_id = 'TEST-AND-01' AND id <> v_gym_1)
+           OR (rut_or_id = 'TEST-AND-02' AND id <> v_gym_2)
+           OR (rut_or_id = 'TEST-OLI-03' AND id <> v_gym_3)
+           OR (rut_or_id = 'TEST-OLI-04' AND id <> v_gym_4)
+    ) THEN
+        RAISE EXCEPTION 'PRE-FLIGHT ABORT: Conflicto en registros de gimnastas ficticias.';
+    END IF;
+
+    -- 1.5 Categoría: ID y Código
+    SELECT id, code INTO v_temp_id, v_temp_text FROM public.categories WHERE id = v_cat_id OR (championship_id = v_champ_id AND code = 'FIG-JR-PILOT') LIMIT 1;
+    IF v_temp_id IS NOT NULL AND (v_temp_id <> v_cat_id OR v_temp_text <> 'FIG-JR-PILOT') THEN
+        RAISE EXCEPTION 'PRE-FLIGHT ABORT: Conflicto en categoría FIG-JR-PILOT.';
+    END IF;
+
+    -- 1.6 Inscripciones: IDs y Atletas asociados
+    IF EXISTS (
+        SELECT 1 FROM public.registrations
+        WHERE (id = v_reg_1 AND gymnast_id <> v_gym_1)
+           OR (id = v_reg_2 AND gymnast_id <> v_gym_2)
+           OR (id = v_reg_3 AND gymnast_id <> v_gym_3)
+           OR (id = v_reg_4 AND gymnast_id <> v_gym_4)
+           OR (id NOT IN (v_reg_1, v_reg_2, v_reg_3, v_reg_4) AND championship_id = v_champ_id AND gymnast_id IN (v_gym_1, v_gym_2, v_gym_3, v_gym_4))
+    ) THEN
+        RAISE EXCEPTION 'PRE-FLIGHT ABORT: Conflicto en inscripciones de gimnastas del piloto.';
+    END IF;
+
+    -- 1.7 Cronograma y Grupos de Rotación: IDs y Nombres
+    IF EXISTS (
+        SELECT 1 FROM public.competition_schedules
+        WHERE (id = v_sched_1 AND championship_id <> v_champ_id)
+           OR (id <> v_sched_1 AND championship_id = v_champ_id AND session_number = 1)
+    ) THEN
+        RAISE EXCEPTION 'PRE-FLIGHT ABORT: Conflicto en cronograma de competencia.';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM public.rotation_groups
+        WHERE (id = v_rot_1 AND name <> 'Grupo 1 - Subdivisión 1')
+           OR (id = v_rot_2 AND name <> 'Grupo 2 - Subdivisión 1')
+           OR (id NOT IN (v_rot_1, v_rot_2) AND championship_id = v_champ_id AND name IN ('Grupo 1 - Subdivisión 1', 'Grupo 2 - Subdivisión 1'))
+    ) THEN
+        RAISE EXCEPTION 'PRE-FLIGHT ABORT: Conflicto en grupos de rotación del piloto.';
+    END IF;
+
+    -- 1.8 Estados de Aparatos y Configuración de Premios
+    IF EXISTS (
+        SELECT 1 FROM public.apparatus_live_status
+        WHERE (id = v_live_vt AND apparatus_code <> 'VT')
+           OR (id = v_live_ub AND apparatus_code <> 'UB')
+           OR (id = v_live_bb AND apparatus_code <> 'BB')
+           OR (id = v_live_fx AND apparatus_code <> 'FX')
+    ) THEN
+        RAISE EXCEPTION 'PRE-FLIGHT ABORT: Conflicto en estados de aparatos en vivo.';
+    END IF;
+
+    IF EXISTS (
+        SELECT 1 FROM public.championship_awards_config
+        WHERE (id = v_awards_cfg AND championship_id <> v_champ_id)
+           OR (id <> v_awards_cfg AND championship_id = v_champ_id)
+    ) THEN
+        RAISE EXCEPTION 'PRE-FLIGHT ABORT: Conflicto en configuración de premios del campeonato.';
+    END IF;
+
+    -- 1.9 Validar presencia de los 4 aparatos oficiales GAF en el catálogo real
     IF (SELECT count(*) FROM public.apparatuses WHERE discipline = 'GAF' AND code IN ('VT', 'UB', 'BB', 'FX')) < 4 THEN
-        RAISE EXCEPTION 'PRE-FLIGHT ABORT: No se encontraron los 4 aparatos oficiales GAF (VT, UB, BB, FX) en la base de datos.';
+        RAISE EXCEPTION 'PRE-FLIGHT ABORT: Faltan aparatos oficiales GAF en la tabla base apparatuses.';
     END IF;
 END $$;
 
 -- ------------------------------------------------------------------------------
--- 2. ORGANIZACIÓN EXPERIMENTAL AISLADA (TENANT SEPARADO)
+-- 2. ORGANIZACIÓN EXPERIMENTAL AISLADA (PLAN FREE / ESTADO TRIAL)
 -- ------------------------------------------------------------------------------
 INSERT INTO public.organizations (
     id,
@@ -86,8 +164,8 @@ INSERT INTO public.organizations (
     'e0000000-0000-0000-0000-000000000001'::uuid,
     'Federación Experimental de Pruebas Operix',
     'fed-piloto-operix',
-    'enterprise',
-    'active',
+    'free',    -- Sin privilegios comerciales
+    'trial',   -- Estado de evaluación/prueba, sin suscripción comercial activa
     'https://images.unsplash.com/photo-1517649763962-0c623266ddc0?auto=format&fit=crop&w=400&q=80',
     timezone('utc'::text, now()),
     timezone('utc'::text, now())
@@ -142,7 +220,9 @@ INSERT INTO public.clubs (
 ON CONFLICT (id) DO NOTHING;
 
 -- ------------------------------------------------------------------------------
--- 4. GIMNASTAS FICTICIAS (COHERENCIA DE EDAD FIG JUNIOR: 13 A 15 AÑOS EN 2026)
+-- 4. GIMNASTAS FICTICIAS (CONFORMIDAD FIG JUNIOR GAF: 14 Y 15 AÑOS EN 2026)
+-- Fuente Oficial: Reglamento Técnico FIG 2025-2028, Sección 1, Art. 5.2 (Límites de Edad Junior)
+-- Para el año 2026, la edad junior oficial FIG GAF corresponde a nacidas en 2011 y 2012.
 -- ------------------------------------------------------------------------------
 INSERT INTO public.gymnasts (
     id,
@@ -166,9 +246,9 @@ INSERT INTO public.gymnasts (
         'Uno Andino',
         'TEST-AND-01',
         'LIC-PILOT-01',
-        '2011-04-12'::date, -- 15 años en 2026 (FIG Junior Válido)
+        '2011-04-12'::date, -- 15 años en 2026 (FIG Junior Reglamentaria)
         'female',
-        'Gimnasta sintética para pruebas de control de rotaciones y juzgamiento.',
+        'Gimnasta sintética de pruebas (FIG Junior GAF, Art. 5.2).',
         timezone('utc'::text, now()),
         timezone('utc'::text, now())
     ),
@@ -180,9 +260,9 @@ INSERT INTO public.gymnasts (
         'Dos Andino',
         'TEST-AND-02',
         'LIC-PILOT-02',
-        '2012-07-25'::date, -- 14 años en 2026 (FIG Junior Válido)
+        '2012-07-25'::date, -- 14 años en 2026 (FIG Junior Reglamentaria)
         'female',
-        'Gimnasta sintética para pruebas de control de rotaciones y juzgamiento.',
+        'Gimnasta sintética de pruebas (FIG Junior GAF, Art. 5.2).',
         timezone('utc'::text, now()),
         timezone('utc'::text, now())
     ),
@@ -194,9 +274,9 @@ INSERT INTO public.gymnasts (
         'Tres Olimpo',
         'TEST-OLI-03',
         'LIC-PILOT-03',
-        '2011-10-18'::date, -- 15 años en 2026 (FIG Junior Válido)
+        '2011-10-18'::date, -- 15 años en 2026 (FIG Junior Reglamentaria)
         'female',
-        'Gimnasta sintética para pruebas de control de rotaciones y juzgamiento.',
+        'Gimnasta sintética de pruebas (FIG Junior GAF, Art. 5.2).',
         timezone('utc'::text, now()),
         timezone('utc'::text, now())
     ),
@@ -208,16 +288,16 @@ INSERT INTO public.gymnasts (
         'Cuatro Olimpo',
         'TEST-OLI-04',
         'LIC-PILOT-04',
-        '2013-02-05'::date, -- 13 años en 2026 (FIG Junior Válido)
+        '2012-11-30'::date, -- 14 años en 2026 (FIG Junior Reglamentaria)
         'female',
-        'Gimnasta sintética para pruebas de control de rotaciones y juzgamiento.',
+        'Gimnasta sintética de pruebas (FIG Junior GAF, Art. 5.2).',
         timezone('utc'::text, now()),
         timezone('utc'::text, now())
     )
 ON CONFLICT (id) DO NOTHING;
 
 -- ------------------------------------------------------------------------------
--- 5. CAMPEONATO PILOTO PRIVADO CON PIN GENERADO CRIPTOGRÁFICAMENTE
+-- 5. CAMPEONATO PILOTO PRIVADO Y BORRADOR (PIN Y CÓDIGOS CRIPTOGRÁFICOS)
 -- ------------------------------------------------------------------------------
 DO $$
 DECLARE
@@ -226,7 +306,7 @@ DECLARE
     v_random_inv TEXT;
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM public.championships WHERE id = v_champ_id) THEN
-        -- Generación dinámica de PIN e Invite Code de alta entropía sin secretos estáticos
+        -- Generación de PIN e Invite Code criptográficos aleatorios en tiempo de ejecución
         v_random_pin := 'PIN-' || upper(substr(encode(gen_random_bytes(6), 'hex'), 1, 8));
         v_random_inv := 'INV-' || upper(substr(encode(gen_random_bytes(6), 'hex'), 1, 8));
 
@@ -257,13 +337,13 @@ BEGIN
             'e0000000-0000-0000-0000-000000000001'::uuid,
             'OPERIX GYMNASTICS — CAMPEONATO PILOTO 2026',
             'piloto-operix-2026',
-            '[CAMPEONATO DE PRUEBA — PRIVADO / EN PREPARACIÓN] Torneo experimental de homologación y validación de sistemas. Acceso público restringido.',
+            '[CAMPEONATO DE PRUEBA — PRIVADO / BORRADOR] Torneo experimental de homologación y validación de sistemas. Acceso público restringido.',
             '2026-11-15'::date,
             '2026-11-16'::date,
             'Santiago, Región Metropolitana',
             'Gimnasio Polideportivo Central (Pabellón Experimental A)',
-            'private',  -- Estrictamente privado en creación inicial
-            'draft',    -- Estado inicial en preparación, no publicado
+            'private',  -- Privado: NO aparece en el portal público
+            'draft',    -- Borrador: en preparación técnica, no iniciado
             'FIG_2025_2028_V1',
             'FIG_STANDARD_V1',
             'https://images.unsplash.com/photo-1547955922-0545fcf80838?auto=format&fit=crop&w=1200&q=80',
@@ -293,7 +373,7 @@ BEGIN
 END $$;
 
 -- ------------------------------------------------------------------------------
--- 6. CATEGORÍA OFICIAL FIG JUNIOR GAF (13 A 15 AÑOS)
+-- 6. CATEGORÍA FIG JUNIOR GAF EXPERIMENTAL (14-15 AÑOS, FIG ART. 5.2)
 -- ------------------------------------------------------------------------------
 INSERT INTO public.categories (
     id,
@@ -313,10 +393,10 @@ INSERT INTO public.categories (
     'e0000000-0000-0000-0000-000000002001'::uuid,
     'e0000000-0000-0000-0000-000000001000'::uuid,
     'GAF',
-    'FIG Junior GAF',
+    'FIG Junior GAF (Experimental Piloto)',
     'FIG-JR-PILOT',
     'female',
-    13,
+    14,
     15,
     1,
     'free',
@@ -431,8 +511,8 @@ INSERT INTO public.competition_schedules (
     '2026-11-15 09:30:00+00'::timestamptz,
     '2026-11-15 12:30:00+00'::timestamptz,
     '2026-11-15 08:30:00+00'::timestamptz,
-    'scheduled', -- Programado, no running aún
-    'Sesión piloto de prueba para cronometraje y marshaling en vivo.',
+    'scheduled',
+    'Sesión piloto de prueba técnica.',
     timezone('utc'::text, now()),
     timezone('utc'::text, now())
 )
@@ -471,7 +551,7 @@ INSERT INTO public.rotation_groups (
 ON CONFLICT (id) DO NOTHING;
 
 -- ------------------------------------------------------------------------------
--- 9. ESTADO EN VIVO DE APARATOS GAF (RESOLUCIÓN DINÁMICA DE IDs REALES)
+-- 9. ESTADO EN VIVO DE APARATOS GAF (RESOLUCIÓN DINÁMICA DE APARATOS REALES)
 -- ------------------------------------------------------------------------------
 INSERT INTO public.apparatus_live_status (
     id,
