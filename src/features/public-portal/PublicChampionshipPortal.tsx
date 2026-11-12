@@ -68,7 +68,7 @@ interface PublishedPodium {
 }
 
 export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> = ({
-  slug = 'nacional-gaf-2026',
+  slug = 'artistica-paillaco-2026',
   onNavigateToDelegates,
   onNavigateHome,
 }) => {

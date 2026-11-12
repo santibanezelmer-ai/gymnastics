@@ -118,7 +118,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => navigate('/evento/nacional-gaf-2026')}
+                onClick={() => navigate('/evento/artistica-paillaco-2026')}
                 title="Ver Portal Público del Campeonato"
                 className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition-colors shadow-2xs"
               >
@@ -339,7 +339,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
       <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
         {!user ? (
           <LandingPage
-            onOpenPublicPortal={(slug) => navigate(`/evento/${slug || 'nacional-gaf-2026'}`)}
+            onOpenPublicPortal={(slug) => navigate(`/evento/${slug || 'artistica-paillaco-2026'}`)}
             onOpenClubRotations={() => navigate('/club/rotaciones')}
           />
         ) : (
@@ -477,7 +477,7 @@ export const App: React.FC = () => {
       <AuthProvider>
         <OrganizationProvider>
           <PublicChampionshipPortal
-            slug={route.params.slug || 'nacional-gaf-2026'}
+            slug={route.params.slug || 'artistica-paillaco-2026'}
             onNavigateToDelegates={() => navigate('/club/rotaciones')}
             onNavigateHome={() => navigate('/')}
           />

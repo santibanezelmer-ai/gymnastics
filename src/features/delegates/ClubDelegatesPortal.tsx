@@ -121,13 +121,13 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
         } else {
           // Fallback con el campeonato oficial activo
           const fallback: Championship = {
-            id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-            organizationId: '',
-            name: 'Campeonato Nacional Apertura GAF 2026',
-            slug: 'nacional-gaf-2026',
-            startDate: '2026-11-03',
-            endDate: '2026-11-06',
-            venueName: 'Polideportivo Estadio Nacional',
+            id: 'c2026000-0000-0000-0000-000000000001',
+            organizationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+            name: 'Campeonato Artística 2026 - Paillaco',
+            slug: 'artistica-paillaco-2026',
+            startDate: '2026-11-15',
+            endDate: '2026-11-15',
+            venueName: 'Gimnasio Municipal de Paillaco',
             visibility: 'public',
             status: 'in_progress',
             rulesetVersion: 'FIG 2025-2028',

@@ -158,7 +158,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             {onOpenPublicPortal && (
               <button
                 type="button"
-                onClick={() => onOpenPublicPortal('nacional-gaf-2026')}
+                onClick={() => onOpenPublicPortal('artistica-paillaco-2026')}
                 className="flex items-center gap-2 rounded-2xl bg-slate-800/80 border border-blue-500/40 px-5 py-3.5 text-sm font-bold text-blue-300 hover:bg-slate-800 hover:text-white transition-all shadow-sm"
               >
                 <Trophy className="h-4 w-4 text-blue-400" />
