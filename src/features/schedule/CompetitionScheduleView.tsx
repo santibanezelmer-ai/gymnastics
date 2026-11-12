@@ -134,9 +134,12 @@ export const CompetitionScheduleView: React.FC = () => {
           const club = r.clubs as { id: string; name: string } | null
           const cat = r.categories as { name: string; discipline?: string } | null
 
-          const defaultApps = ['VT', 'UB', 'BB', 'FX']
-          const rotGroup = (r.rotation_group as string) || `Grupo ${String.fromCharCode(65 + (idx % 4))}`
-          const startApp = (r.starting_apparatus as string) || defaultApps[idx % 4]
+          const isGAM = (r.subdivision === 'Varones') || (cat?.discipline === 'GAM')
+          const defaultApps = isGAM
+            ? ['FX', 'PH', 'SR', 'VT', 'PB', 'HB']
+            : ['VT', 'UB', 'BB', 'FX']
+          const rotGroup = (r.rotation_group as string) || `Grupo ${String.fromCharCode(65 + (idx % defaultApps.length))}`
+          const startApp = (r.starting_apparatus as string) || defaultApps[idx % defaultApps.length]
 
           return {
             registrationId: r.id as string,
@@ -243,10 +246,24 @@ export const CompetitionScheduleView: React.FC = () => {
   // Current championship object
   const currentChamp = championships.find((c) => c.id === selectedChampId)
 
-  // Active discipline apparatuses
+  // Filtered athletes by subdivision
+  const filteredAthletes = useMemo(() => {
+    if (selectedSubdivision === 'Todas') return athletes
+    return athletes.filter((a) => a.subdivision === selectedSubdivision)
+  }, [athletes, selectedSubdivision])
+
+  // Active discipline apparatuses dynamically based on selected subdivision
   const apparatusCodes = useMemo(() => {
-    return ['VT', 'UB', 'BB', 'FX']
-  }, [])
+    const isGAM =
+      selectedSubdivision === 'Varones' ||
+      (filteredAthletes.length > 0 &&
+        filteredAthletes.every(
+          (a) => a.subdivision === 'Varones' || a.categoryName?.includes('GAM')
+        ))
+    return isGAM
+      ? ['FX', 'PH', 'SR', 'VT', 'PB', 'HB']
+      : ['VT', 'UB', 'BB', 'FX']
+  }, [selectedSubdivision, filteredAthletes])
 
   const apparatusNames: Record<string, string> = {
     VT: 'Salto de Caballo / Salto',
@@ -258,12 +275,6 @@ export const CompetitionScheduleView: React.FC = () => {
     PB: 'Barras Paralelas',
     HB: 'Barra Fija',
   }
-
-  // Filtered athletes by subdivision
-  const filteredAthletes = useMemo(() => {
-    if (selectedSubdivision === 'Todas') return athletes
-    return athletes.filter((a) => a.subdivision === selectedSubdivision)
-  }, [athletes, selectedSubdivision])
 
   // Unique subdivisions
   const subdivisionsList = useMemo(() => {

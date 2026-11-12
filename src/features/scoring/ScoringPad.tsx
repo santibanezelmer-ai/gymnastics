@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import {
   calculateDisciplineScore,
@@ -125,12 +125,17 @@ export const ScoringPad: React.FC<ScoringPadProps> = ({ onScoreSaved }) => {
           }
         })
 
+        // Sort mapped registrations alphabetically by gymnast name
+        mapped.sort((a, b) => a.gymnastName.localeCompare(b.gymnastName, 'es', { sensitivity: 'base' }))
+
         setRegistrations(mapped)
         if (mapped.length > 0) {
-          setSelectedRegId(mapped[0].registrationId)
-          setSelectedDiscipline(mapped[0].discipline)
-          setIsObligatory(mapped[0].scoringRegime === 'obligatory')
-          setFixedD(mapped[0].defaultFixedDScore.toString())
+          // Prefer GAF as initial default since it represents the majority in artistic gymnastics
+          const defaultReg = mapped.find((m) => m.discipline === 'GAF') || mapped[0]
+          setSelectedRegId(defaultReg.registrationId)
+          setSelectedDiscipline(defaultReg.discipline)
+          setIsObligatory(defaultReg.scoringRegime === 'obligatory')
+          setFixedD(defaultReg.defaultFixedDScore.toString())
         }
       }
     }
@@ -179,7 +184,13 @@ export const ScoringPad: React.FC<ScoringPadProps> = ({ onScoreSaved }) => {
       setIsObligatory(isOblig)
       setFixedD(reg.defaultFixedDScore.toString())
     }
-  }, [selectedRegId, registrations, selectedDiscipline])
+  }, [selectedRegId, registrations])
+
+  // Athletes filtered by active discipline (or all if none match)
+  const filteredRegistrations = useMemo<RegistrationOption[]>(() => {
+    const list = registrations.filter((r) => r.discipline === selectedDiscipline)
+    return list.length > 0 ? list : registrations
+  }, [registrations, selectedDiscipline])
 
   const currentApp = apparatuses.find((a) => a.id === selectedAppId)
   const currentAppCode = currentApp?.code || 'VT'
@@ -295,7 +306,15 @@ export const ScoringPad: React.FC<ScoringPadProps> = ({ onScoreSaved }) => {
             <button
               key={d.code}
               type="button"
-              onClick={() => setSelectedDiscipline(d.code)}
+              onClick={() => {
+                setSelectedDiscipline(d.code)
+                const firstOfDisc = registrations.find((r) => r.discipline === d.code)
+                if (firstOfDisc) {
+                  setSelectedRegId(firstOfDisc.registrationId)
+                  setIsObligatory(firstOfDisc.scoringRegime === 'obligatory')
+                  setFixedD(firstOfDisc.defaultFixedDScore.toString())
+                }
+              }}
               className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all ${
                 selectedDiscipline === d.code
                   ? 'bg-blue-700 text-white shadow-xs'
@@ -312,11 +331,11 @@ export const ScoringPad: React.FC<ScoringPadProps> = ({ onScoreSaved }) => {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4 p-3 rounded-xl bg-slate-50 border border-slate-200">
         <div>
           <label className="block text-[11px] font-bold text-slate-700 mb-1 flex items-center gap-1">
-            <User className="h-3.5 w-3.5 text-slate-500" /> Atleta / Gimnasta en Pista
+            <User className="h-3.5 w-3.5 text-slate-500" /> Atleta / Gimnasta ({OFFICIAL_DISCIPLINES[selectedDiscipline]?.shortName || selectedDiscipline})
           </label>
-          {registrations.length === 0 ? (
+          {filteredRegistrations.length === 0 ? (
             <p className="text-xs text-amber-700 font-medium">
-              No hay atletas aprobados aún en el campeonato.
+              No hay atletas aprobados en {selectedDiscipline}.
             </p>
           ) : (
             <select
@@ -324,9 +343,9 @@ export const ScoringPad: React.FC<ScoringPadProps> = ({ onScoreSaved }) => {
               onChange={(e) => setSelectedRegId(e.target.value)}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 focus:border-blue-600 focus:outline-none"
             >
-              {registrations.map((r) => (
+              {filteredRegistrations.map((r) => (
                 <option key={r.registrationId} value={r.registrationId}>
-                  {r.gymnastName} • {r.clubName} ({r.discipline} - {r.categoryName})
+                  {r.gymnastName} • {r.clubName} ({r.categoryName})
                 </option>
               ))}
             </select>
