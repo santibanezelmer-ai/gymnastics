@@ -33,6 +33,7 @@ import {
   ExternalLink,
   ShieldCheck,
   Info,
+  AlertCircle,
 } from 'lucide-react'
 import type { Championship } from '@/core/types/championship'
 
@@ -152,83 +153,27 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
 
           if (clubsData && clubsData.length > 0) {
             setParticipatingClubs(
-              clubsData.map((cl, i) => ({
+              clubsData.map((cl) => ({
                 id: cl.id,
                 name: cl.name,
                 code: cl.code,
-                city: cl.city || 'Santiago',
+                city: cl.city || 'Chile',
                 country: cl.country || 'Chile',
-                gymnastCount: 8 + (i * 3) % 15, // Estimado público para mostrar representación
+                gymnastCount: 0,
               }))
             )
           } else {
-            // Fallback de demostración pública
-            setParticipatingClubs([
-              { id: 'c1', name: 'Club Gimnástico Central', code: 'CGC', city: 'Santiago', country: 'Chile', gymnastCount: 18 },
-              { id: 'c2', name: 'Stadio Italiano Gimnasia', code: 'STADIO', city: 'Las Condes', country: 'Chile', gymnastCount: 14 },
-              { id: 'c3', name: 'Club Deportivo Alemán', code: 'CDA', city: 'Concepción', country: 'Chile', gymnastCount: 12 },
-              { id: 'c4', name: 'Asociación Deportiva Viña del Mar', code: 'ADVM', city: 'Viña del Mar', country: 'Chile', gymnastCount: 9 },
-              { id: 'c5', name: 'Club Osorno Gym', code: 'OSG', city: 'Osorno', country: 'Chile', gymnastCount: 7 },
-            ])
+            setParticipatingClubs([])
           }
         } else {
-          // Si no se encuentra en Supabase por el slug exacto, usar datos predeterminados
-          const fallback: Championship = {
-            id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
-            organizationId: 'org-demo',
-            name: 'Campeonato Nacional Apertura GAF 2026',
-            slug: currentSlug,
-            description:
-              'Torneo oficial federado de gimnasia artística femenina con participación de los principales clubes y delegaciones del país. Evaluado bajo el Código de Puntuación FIG 2025-2028.',
-            startDate: '2026-11-03',
-            endDate: '2026-11-06',
-            location: 'Santiago, Chile',
-            venueName: 'Polideportivo Estadio Nacional (Cancha Central)',
-            visibility: 'public',
-            status: 'in_progress',
-            rulesetVersion: 'FIG_2025_2028_V1',
-            scoringSchemaVersion: 'FIG_STANDARD_V1',
-            basesUrl: 'https://operix.app/docs/bases-nacional-gaf-2026.pdf',
-            createdAt: '2026-10-25',
-            updatedAt: '2026-11-05',
-          }
-          setChampionship(fallback)
-          setCategories([
-            { id: '1', name: 'FIG Senior (Élite)', discipline: 'GAF', gender: 'Femenino', scoringRegime: 'Libre FIG' },
-            { id: '2', name: 'FIG Junior (14-15 años)', discipline: 'GAF', gender: 'Femenino', scoringRegime: 'Libre FIG' },
-            { id: '3', name: 'Nivel 5 USAG Avanzado', discipline: 'GAF', gender: 'Femenino', scoringRegime: 'D Fija 10.0 + E' },
-            { id: '4', name: 'Nivel 4 Formativo', discipline: 'GAF', gender: 'Femenino', scoringRegime: 'D Fija 10.0 + E' },
-          ])
-          setParticipatingClubs([
-            { id: 'c1', name: 'Club Gimnástico Central', code: 'CGC', city: 'Santiago', country: 'Chile', gymnastCount: 18 },
-            { id: 'c2', name: 'Stadio Italiano Gimnasia', code: 'STADIO', city: 'Las Condes', country: 'Chile', gymnastCount: 14 },
-            { id: 'c3', name: 'Club Deportivo Alemán', code: 'CDA', city: 'Concepción', country: 'Chile', gymnastCount: 12 },
-            { id: 'c4', name: 'Asociación Deportiva Viña del Mar', code: 'ADVM', city: 'Viña del Mar', country: 'Chile', gymnastCount: 9 },
-          ])
+          // Si no se encuentra en Supabase por el slug exacto, marcar como no encontrado (404)
+          setChampionship(null)
+          setCategories([])
+          setParticipatingClubs([])
         }
 
-        // Cargar podios y resultados publicados
-        setPodiums([
-          {
-            categoryName: 'FIG Senior · All-Around Individual',
-            gold: { name: 'Valentina Silva', club: 'Club Gimnástico Central', score: 52.850 },
-            silver: { name: 'Catalina Rivas', club: 'Stadio Italiano', score: 51.400 },
-            bronze: { name: 'Camila Muñoz', club: 'Club Deportivo Alemán', score: 50.150 },
-          },
-          {
-            categoryName: 'FIG Junior · Salto de Caballo (VT)',
-            apparatusCode: 'VT',
-            gold: { name: 'Isidora Castro', club: 'Club Gimnástico Central', score: 13.450 },
-            silver: { name: 'Florencia Lagos', club: 'Asoc. Viña del Mar', score: 13.100 },
-            bronze: { name: 'Martina Morales', club: 'Club Osorno Gym', score: 12.850 },
-          },
-          {
-            categoryName: 'Clasificación General por Clubes / Equipos',
-            gold: { name: 'Club Gimnástico Central', club: 'Santiago', score: 156.400 },
-            silver: { name: 'Stadio Italiano Gimnasia', club: 'Las Condes', score: 152.950 },
-            bronze: { name: 'Club Deportivo Alemán', club: 'Concepción', score: 148.600 },
-          },
-        ])
+        // Podios oficiales (vacíos hasta que el jurado oficialice los resultados de pista)
+        setPodiums([])
 
         // Cargar lista general de campeonatos públicos para selector
         const { data: allChamps } = await supabase
@@ -343,9 +288,47 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
       </nav>
 
       {/* ---------------------------------------------------------------------
-          HERO BANNER (Referencia Kluv Event Header)
+          ESTADO 404: CAMPEONATO NO ENCONTRADO
           --------------------------------------------------------------------- */}
-      <header className="relative border-b border-slate-800 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 px-4 py-10 sm:px-6 sm:py-14 overflow-hidden">
+      {!isLoading && !championship && (
+        <div className="mx-auto max-w-2xl px-4 py-28 text-center">
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400 shadow-xl">
+            <AlertCircle className="h-10 w-10" />
+          </div>
+          <h1 className="text-3xl font-black text-white tracking-tight mb-3">
+            Campeonato No Encontrado
+          </h1>
+          <p className="text-sm sm:text-base text-slate-400 mb-8 max-w-md mx-auto leading-relaxed">
+            El evento que intentas consultar no existe o no se encuentra publicado oficialmente en la plataforma.
+          </p>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <a
+              href="/evento/artistica-paillaco-2026"
+              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-bold text-white shadow-md hover:bg-blue-500 transition-all"
+            >
+              <Trophy className="h-4 w-4" />
+              <span>Ver Campeonato Paillaco 2026</span>
+            </a>
+            {onNavigateHome && (
+              <button
+                type="button"
+                onClick={onNavigateHome}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-5 py-2.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-all"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Volver al Inicio</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {championship && (
+        <>
+          {/* ---------------------------------------------------------------------
+              HERO BANNER (Referencia Kluv Event Header)
+              --------------------------------------------------------------------- */}
+          <header className="relative border-b border-slate-800 bg-gradient-to-b from-slate-900 via-slate-950 to-slate-950 px-4 py-10 sm:px-6 sm:py-14 overflow-hidden">
         {/* Glow ambient background */}
         <div className="absolute top-0 right-1/4 h-72 w-72 rounded-full bg-blue-600/10 blur-3xl pointer-events-none" />
         <div className="absolute bottom-0 left-1/3 h-64 w-64 rounded-full bg-indigo-600/10 blur-3xl pointer-events-none" />
@@ -846,6 +829,8 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
           </div>
         )}
       </main>
+      </>
+      )}
 
       {/* ---------------------------------------------------------------------
           FOOTER
