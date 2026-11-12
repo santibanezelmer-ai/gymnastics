@@ -30,7 +30,8 @@ export interface Gymnast {
   lastName: string
   rutOrId?: string
   licenseNumber?: string
-  birthDate: string
+  birthDate?: string | null
+  birthYear?: number | null
   gender: GenderCategory
   medicalClearanceDate?: string
   notes?: string

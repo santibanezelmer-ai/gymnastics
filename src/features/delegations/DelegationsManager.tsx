@@ -90,7 +90,8 @@ export const DelegationsManager: React.FC = () => {
         lastName: row.last_name,
         rutOrId: row.rut_or_id ?? undefined,
         licenseNumber: row.license_number ?? undefined,
-        birthDate: row.birth_date,
+        birthDate: row.birth_date ?? undefined,
+        birthYear: row.birth_year ?? undefined,
         gender: row.gender,
         medicalClearanceDate: row.medical_clearance_date ?? undefined,
         notes: row.notes ?? undefined,
@@ -145,9 +146,9 @@ export const DelegationsManager: React.FC = () => {
       const { error } = await supabase.from('gymnasts').insert({
         organization_id: activeOrganization.id,
         club_id: selectedClubId,
-        first_name: gymnastFirstName,
-        last_name: gymnastLastName,
-        birth_date: gymnastBirthDate,
+        first_name: gymnastFirstName.trim(),
+        last_name: gymnastLastName.trim(),
+        birth_date: gymnastBirthDate || null,
         gender: gymnastGender,
         license_number: gymnastLicense || null,
       })
@@ -372,10 +373,9 @@ export const DelegationsManager: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-medium text-slate-700 mb-1">Fecha de Nacimiento</label>
+                  <label className="block text-[11px] font-medium text-slate-700 mb-1">Fecha de Nacimiento (Opcional)</label>
                   <input
                     type="date"
-                    required
                     value={gymnastBirthDate}
                     onChange={(e) => setGymnastBirthDate(e.target.value)}
                     className="w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs focus:border-emerald-600 focus:outline-none"
@@ -465,7 +465,9 @@ export const DelegationsManager: React.FC = () => {
                           {gymnast.gender === 'female' ? 'Femenino' : 'Masculino'}
                         </Badge>
                       </td>
-                      <td className="px-4 py-2.5 font-mono text-[11px]">{gymnast.birthDate}</td>
+                      <td className="px-4 py-2.5 font-mono text-[11px]">
+                        {gymnast.birthDate || (gymnast.birthYear ? `Año ${gymnast.birthYear}` : <span className="text-slate-400 italic">No informada</span>)}
+                      </td>
                       <td className="px-4 py-2.5 font-mono text-[11px]">
                         {gymnast.licenseNumber || <span className="text-slate-400">Sin licencia</span>}
                       </td>

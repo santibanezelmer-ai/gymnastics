@@ -23,6 +23,27 @@ const OrganizationContext = createContext<OrganizationContextType | undefined>(u
 
 const ACTIVE_ORG_STORAGE_KEY = 'operix_active_org_id'
 
+const DEV_ORGANIZATION_MEMBERSHIP: UserOrganizationMembership = {
+  organization: {
+    id: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    slug: 'fenagichi',
+    name: 'Federación Nacional de Gimnasia de Chile',
+    billingPlan: 'enterprise',
+    subscriptionStatus: 'active',
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+  membership: {
+    id: 'mem-dev-001',
+    organizationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    userId: '00000000-0000-0000-0000-000000000001',
+    role: 'org_admin',
+    isActive: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  },
+}
+
 export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth()
   const [organizations, setOrganizations] = useState<UserOrganizationMembership[]>([])
@@ -34,6 +55,13 @@ export const OrganizationProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const fetchOrganizations = useCallback(async () => {
     if (!user) {
       setOrganizations([])
+      setIsLoading(false)
+      return
+    }
+
+    if (import.meta.env.DEV && user.id === '00000000-0000-0000-0000-000000000001') {
+      setOrganizations([DEV_ORGANIZATION_MEMBERSHIP])
+      setActiveOrgId('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa')
       setIsLoading(false)
       return
     }

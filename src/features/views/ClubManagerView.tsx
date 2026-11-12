@@ -36,7 +36,8 @@ export interface ClubGymnastRecord {
   id: string
   firstName: string
   lastName: string
-  birthDate: string
+  birthDate?: string | null
+  birthYear?: number | null
   gender: 'female' | 'male'
   rutOrId?: string
   licenseNumber?: string
@@ -139,6 +140,7 @@ export const ClubManagerView: React.FC<ClubManagerViewProps> = ({ onCreateChampi
             firstName: g.first_name,
             lastName: g.last_name,
             birthDate: g.birth_date,
+            birthYear: g.birth_year,
             gender: g.gender as 'female' | 'male',
             rutOrId: g.rut_or_id ?? undefined,
             licenseNumber: g.license_number ?? undefined,
@@ -304,7 +306,7 @@ export const ClubManagerView: React.FC<ClubManagerViewProps> = ({ onCreateChampi
         club_id: clubId,
         first_name: newFirstName.trim(),
         last_name: newLastName.trim(),
-        birth_date: newBirthDate,
+        birth_date: newBirthDate || null,
         gender: newGender,
         rut_or_id: newRut.trim() || null,
         license_number: newLicense.trim() || null,
@@ -347,7 +349,7 @@ export const ClubManagerView: React.FC<ClubManagerViewProps> = ({ onCreateChampi
 
         const firstName = parts[0]
         const lastName = parts[1]
-        const birthDate = parts[2] && parts[2].match(/^\d{4}-\d{2}-\d{2}$/) ? parts[2] : '2012-01-01'
+        const birthDate = parts[2] && parts[2].match(/^\d{4}-\d{2}-\d{2}$/) ? parts[2] : null
         const licenseOrRut = parts[3] || `FED-${Math.floor(Math.random() * 9000 + 1000)}`
 
         toInsert.push({
@@ -440,15 +442,24 @@ export const ClubManagerView: React.FC<ClubManagerViewProps> = ({ onCreateChampi
     }
   }
 
-  const calculateAge = (birthDateString: string) => {
-    const today = new Date()
-    const birth = new Date(birthDateString)
-    let age = today.getFullYear() - birth.getFullYear()
-    const m = today.getMonth() - birth.getMonth()
-    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
-      age--
+  const calculateAge = (birthDateString?: string | null, birthYear?: number | null) => {
+    if (birthDateString) {
+      const today = new Date()
+      const birth = new Date(birthDateString)
+      if (isNaN(birth.getTime())) return '-'
+      let age = today.getFullYear() - birth.getFullYear()
+      const m = today.getMonth() - birth.getMonth()
+      if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) {
+        age--
+      }
+      return `${age} años`
     }
-    return isNaN(age) ? '-' : `${age} años`
+    if (birthYear && birthYear >= 1900 && birthYear <= 2100) {
+      const today = new Date()
+      const age = today.getFullYear() - birthYear
+      return `aprox. ${age} años (Año ${birthYear})`
+    }
+    return '-'
   }
 
   return (
@@ -644,10 +655,9 @@ export const ClubManagerView: React.FC<ClubManagerViewProps> = ({ onCreateChampi
                   </div>
 
                   <div>
-                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Fecha de Nacimiento</label>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">Fecha de Nacimiento (Opcional)</label>
                     <input
                       type="date"
-                      required
                       value={newBirthDate}
                       onChange={(e) => setNewBirthDate(e.target.value)}
                       className="w-full rounded border border-slate-300 bg-white px-2.5 py-1.5 text-xs focus:border-emerald-600 focus:outline-none"
@@ -794,7 +804,8 @@ export const ClubManagerView: React.FC<ClubManagerViewProps> = ({ onCreateChampi
                           {gym.firstName} {gym.lastName}
                         </td>
                         <td className="px-4 py-3 text-slate-600">
-                          {gym.birthDate} <span className="text-[10px] text-slate-400">({calculateAge(gym.birthDate)})</span>
+                          {gym.birthDate || (gym.birthYear ? `Año ${gym.birthYear}` : <span className="text-slate-400 italic">No informada</span>)}{' '}
+                          <span className="text-[10px] text-slate-400">({calculateAge(gym.birthDate, gym.birthYear)})</span>
                         </td>
                         <td className="px-4 py-3 font-mono text-[11px] text-slate-600">
                           {gym.rutOrId || 'Sin registrar'}

@@ -35,6 +35,14 @@ function parsePath(pathname: string): RouteState {
     }
   }
 
+  // 3. Match /campeonatos
+  if (cleanPath === '/campeonatos' || cleanPath.startsWith('/campeonatos')) {
+    return {
+      path: '/campeonatos',
+      params: {},
+    }
+  }
+
   return {
     path: cleanPath,
     params: {},

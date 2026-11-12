@@ -423,7 +423,8 @@ export interface Database {
           last_name: string
           rut_or_id: string | null
           license_number: string | null
-          birth_date: string
+          birth_date: string | null
+          birth_year: number | null
           gender: 'female' | 'male' | 'mixed'
           medical_clearance_date: string | null
           notes: string | null
@@ -438,7 +439,8 @@ export interface Database {
           last_name: string
           rut_or_id?: string | null
           license_number?: string | null
-          birth_date: string
+          birth_date?: string | null
+          birth_year?: number | null
           gender?: 'female' | 'male' | 'mixed'
           medical_clearance_date?: string | null
           notes?: string | null
@@ -453,7 +455,8 @@ export interface Database {
           last_name?: string
           rut_or_id?: string | null
           license_number?: string | null
-          birth_date?: string
+          birth_date?: string | null
+          birth_year?: number | null
           gender?: 'female' | 'male' | 'mixed'
           medical_clearance_date?: string | null
           notes?: string | null

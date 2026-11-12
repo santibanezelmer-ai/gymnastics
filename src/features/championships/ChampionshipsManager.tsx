@@ -30,13 +30,16 @@ import {
   Edit3,
   ExternalLink,
   Users,
+  FileSpreadsheet,
 } from 'lucide-react'
+import { ExcelChampionshipImporter } from './importer/ExcelChampionshipImporter'
 
 export const ChampionshipsManager: React.FC = () => {
   const { activeOrganization, activeRole } = useOrganization()
   const [championships, setChampionships] = useState<Championship[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
+  const [isImportingExcel, setIsImportingExcel] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   // Form fields for Championship
@@ -372,16 +375,39 @@ export const ChampionshipsManager: React.FC = () => {
         </div>
 
         {canManage && !isCreating && (
-          <button
-            type="button"
-            onClick={() => setIsCreating(true)}
-            className="flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-800 transition-colors self-start sm:self-auto"
-          >
-            <Plus className="h-4 w-4" />
-            <span>Nuevo Campeonato</span>
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => setIsImportingExcel(true)}
+              className="flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-emerald-800 transition-colors"
+            >
+              <FileSpreadsheet className="h-4 w-4" />
+              <span>Importar desde Excel</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsCreating(true)}
+              className="flex items-center gap-2 rounded-xl bg-blue-700 px-4 py-2 text-xs font-bold text-white shadow-xs hover:bg-blue-800 transition-colors"
+            >
+              <Plus className="h-4 w-4" />
+              <span>Nuevo Campeonato</span>
+            </button>
+          </div>
         )}
       </div>
+
+      {isImportingExcel && activeOrganization && (
+        <ExcelChampionshipImporter
+          organizationId={activeOrganization.id}
+          onClose={() => {
+            setIsImportingExcel(false)
+            loadChampionships()
+          }}
+          onImportComplete={() => {
+            loadChampionships()
+          }}
+        />
+      )}
 
       {errorMsg && (
         <div className="flex items-center gap-2 rounded-lg bg-rose-50 p-3 text-xs text-rose-700 border border-rose-200">

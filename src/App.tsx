@@ -35,10 +35,21 @@ import {
 
 interface DashboardContentProps {
   navigate: (to: string) => void
+  initialTab?:
+    | 'overview'
+    | 'championships'
+    | 'delegations'
+    | 'judging'
+    | 'schedule'
+    | 'standings'
+    | 'awards'
+    | 'reports'
+    | 'billing'
+    | 'club_rotations'
 }
 
-const DashboardContent: React.FC<DashboardContentProps> = ({ navigate }) => {
-  const { user, profile, signOut } = useAuth()
+const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTab = 'overview' }) => {
+  const { user, profile, signOut, signInDevAdmin } = useAuth()
   const { activeOrganization, activeRole, organizations } = useOrganization()
   const [activeTab, setActiveTab] = useState<
     | 'overview'
@@ -51,7 +62,14 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate }) => {
     | 'reports'
     | 'billing'
     | 'club_rotations'
-  >('overview')
+  >(initialTab)
+
+  React.useEffect(() => {
+    if (import.meta.env.DEV && initialTab === 'championships' && !user) {
+      signInDevAdmin()
+      setActiveTab('championships')
+    }
+  }, [initialTab, user, signInDevAdmin])
 
   type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'outline'
 
@@ -143,6 +161,19 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate }) => {
               </div>
             ) : (
               <div className="flex items-center gap-2 border-l border-slate-200 pl-3">
+                {import.meta.env.DEV && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      signInDevAdmin()
+                      setActiveTab('championships')
+                    }}
+                    className="flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50/90 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 transition-colors shadow-2xs"
+                  >
+                    <Trophy className="h-3.5 w-3.5 text-blue-600" />
+                    <span>Módulo Campeonatos (Dev)</span>
+                  </button>
+                )}
                 <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 border border-slate-200">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                   Acceso Público & Torneos
@@ -469,7 +500,18 @@ export const App: React.FC = () => {
     )
   }
 
-  // 3. RUTA GENERAL: Dashboard / Landing Page
+  // 3. RUTA CAMPEONATOS: /campeonatos (Módulo de Campeonatos)
+  if (route.path === '/campeonatos') {
+    return (
+      <AuthProvider>
+        <OrganizationProvider>
+          <DashboardContent navigate={navigate} initialTab="championships" />
+        </OrganizationProvider>
+      </AuthProvider>
+    )
+  }
+
+  // 4. RUTA GENERAL: Dashboard / Landing Page
   return (
     <AuthProvider>
       <OrganizationProvider>

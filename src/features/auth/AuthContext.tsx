@@ -10,6 +10,28 @@ export interface AuthContextType {
   isLoading: boolean
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  signInDevAdmin: () => void
+}
+
+const DEV_MOCK_USER: User = {
+  id: '00000000-0000-0000-0000-000000000001',
+  app_metadata: {},
+  user_metadata: { full_name: 'Administrador Técnico Operix' },
+  aud: 'authenticated',
+  created_at: new Date().toISOString(),
+  email: 'admin@operix.local',
+  phone: '',
+  role: 'authenticated',
+  updated_at: new Date().toISOString(),
+}
+
+const DEV_MOCK_PROFILE: UserProfile = {
+  id: '00000000-0000-0000-0000-000000000001',
+  email: 'admin@operix.local',
+  fullName: 'Administrador Técnico Operix',
+  platformRole: 'platform_admin',
+  createdAt: new Date().toISOString(),
+  updatedAt: new Date().toISOString(),
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -49,6 +71,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }
 
   useEffect(() => {
+    // 0. Check Dev Auth Override (Solo en entorno local de desarrollo)
+    if (import.meta.env.DEV && localStorage.getItem('operix_dev_auth') === 'true') {
+      setUser(DEV_MOCK_USER)
+      setProfile(DEV_MOCK_PROFILE)
+      setIsLoading(false)
+      return
+    }
+
     // 1. Initial Session Check
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
@@ -63,6 +93,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // 2. Auth State Change Listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, newSession) => {
+        if (localStorage.getItem('operix_dev_auth') === 'true') {
+          return
+        }
         setSession(newSession)
         setUser(newSession?.user ?? null)
         if (newSession?.user) {
@@ -79,7 +112,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [])
 
+  const signInDevAdmin = () => {
+    if (!import.meta.env.DEV) return
+    localStorage.setItem('operix_dev_auth', 'true')
+    setUser(DEV_MOCK_USER)
+    setProfile(DEV_MOCK_PROFILE)
+    setIsLoading(false)
+  }
+
   const signOut = async () => {
+    localStorage.removeItem('operix_dev_auth')
     await supabase.auth.signOut()
     setUser(null)
     setSession(null)
@@ -100,6 +142,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       isLoading,
       signOut,
       refreshProfile,
+      signInDevAdmin,
     }),
     [user, session, profile, isLoading]
   )
