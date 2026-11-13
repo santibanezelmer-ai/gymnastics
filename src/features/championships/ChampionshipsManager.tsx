@@ -420,160 +420,209 @@ export const ChampionshipsManager: React.FC = () => {
       )}
 
       {isCreating && (
-        <Card className="border-blue-200 bg-blue-50/30">
-          <h4 className="text-sm font-bold text-slate-900 mb-4">Crear Nuevo Campeonato</h4>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Nombre del Campeonato</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Campeonato Nacional GAF Apertura 2026"
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value)
-                    setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''))
-                  }}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                />
-              </div>
+        <Card className="border-blue-200 bg-white shadow-xl p-6 rounded-3xl">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4 mb-6">
+            <div>
+              <span className="text-xs font-bold uppercase tracking-wider text-blue-700">
+                Paso a Paso Operativo
+              </span>
+              <h4 className="text-lg font-black text-slate-900 tracking-tight mt-0.5">
+                Crear Nuevo Campeonato Oficial
+              </h4>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsCreating(false)}
+              className="rounded-xl p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Slug URL</label>
-                <input
-                  type="text"
-                  required
-                  value={slug}
-                  onChange={(e) => setSlug(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono focus:border-blue-600 focus:outline-none"
-                />
+          <form onSubmit={handleCreate} className="space-y-6">
+            {/* SECCIÓN 1: IDENTIDAD & SEDE */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-800">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-[10px]">1</span>
+                <span>Identidad del Campeonato & Sede</span>
               </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Nombre Oficial</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Campeonato Nacional GAF Apertura 2026"
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value)
+                      setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''))
+                    }}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Fecha de Inicio</label>
-                <input
-                  type="date"
-                  required
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                />
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Slug URL del Evento</label>
+                  <input
+                    type="text"
+                    required
+                    value={slug}
+                    onChange={(e) => setSlug(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono text-slate-900 focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Fecha de Inicio</label>
+                  <input
+                    type="date"
+                    required
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Fecha de Término</label>
+                  <input
+                    type="date"
+                    required
+                    min={startDate}
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Ciudad / Ubicación</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Paillaco, Región de Los Ríos"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Gimnasio / Recinto</label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Gimnasio Municipal de Paillaco"
+                    value={venueName}
+                    onChange={(e) => setVenueName(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Fecha de Término</label>
-                <input
-                  type="date"
-                  required
-                  min={startDate}
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                />
+            {/* SECCIÓN 2: REGLAMENTO & VISIBILIDAD */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-800">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-[10px]">2</span>
+                <span>Reglamento Técnico FIG & Visibilidad</span>
               </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Visibilidad del Torneo</label>
+                  <select
+                    value={visibility}
+                    onChange={(e) => setVisibility(e.target.value as ChampionshipVisibility)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-blue-600 focus:outline-none"
+                  >
+                    <option value="public">Público (Visible en portal web para familias)</option>
+                    <option value="private">Privado (Solo administradores de organización)</option>
+                    <option value="invitational">Por Invitación (Clubes autorizados con código)</option>
+                  </select>
+                </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Ciudad / Ubicación</label>
-                <input
-                  type="text"
-                  placeholder="Ej. Santiago, Chile"
-                  value={location}
-                  onChange={(e) => setLocation(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                />
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Código de Puntuación (Reglamento)</label>
+                  <select
+                    value={rulesetVersion}
+                    onChange={(e) => setRulesetVersion(e.target.value)}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 focus:border-blue-600 focus:outline-none"
+                  >
+                    <option value="FIG_2025_2028_V1">FIG Código de Puntuación 2025-2028</option>
+                    <option value="USAG_DEVELOPMENT_2024">USAG Niveles 1 al 10 (2024)</option>
+                    <option value="ESCOLAR_FORMATIVO_V1">Reglamento Escolar / Promocional</option>
+                  </select>
+                </div>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Gimnasio / Recinto</label>
-                <input
-                  type="text"
-                  placeholder="Ej. Polideportivo Estadio Nacional"
-                  value={venueName}
-                  onChange={(e) => setVenueName(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                />
+            {/* SECCIÓN 3: CÓDIGOS DE ACCESO SEGUROS */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-4">
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-800">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-[10px]">3</span>
+                <span>Códigos de Acceso (Invitación & Jueces de Pista)</span>
               </div>
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    Código Invitación para Clubes
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. PAILLACO-2026 (Generado auto si está vacío)"
+                    value={inviteCode}
+                    onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono uppercase text-slate-900 focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Visibilidad</label>
-                <select
-                  value={visibility}
-                  onChange={(e) => setVisibility(e.target.value as ChampionshipVisibility)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                >
-                  <option value="public">Público (Visible en portal de resultados)</option>
-                  <option value="private">Privado (Solo organizador)</option>
-                  <option value="invitational">Por Invitación (Solo clubes autorizados)</option>
-                </select>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    PIN Jueces de Pista (Fast Judge)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. JUEZ-2026 (Generado auto si está vacío)"
+                    value={judgeCode}
+                    onChange={(e) => setJudgeCode(e.target.value.toUpperCase())}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-mono uppercase text-slate-900 focus:border-blue-600 focus:outline-none"
+                  />
+                </div>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">Código de Puntuación (Reglamento)</label>
-                <select
-                  value={rulesetVersion}
-                  onChange={(e) => setRulesetVersion(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
-                >
-                  <option value="FIG_2025_2028_V1">FIG Código de Puntuación 2025-2028</option>
-                  <option value="USAG_DEVELOPMENT_2024">USAG Niveles 1 al 10 (2024)</option>
-                  <option value="ESCOLAR_FORMATIVO_V1">Reglamento Escolar / Promocional</option>
-                </select>
+            {/* SECCIÓN 4: DOCUMENTACIÓN Y BASES TÉCNICAS */}
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-black uppercase tracking-wider text-slate-800">
+                <span className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white text-[10px]">4</span>
+                <span>Documento Oficial de Bases Técnicas</span>
               </div>
-
               <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Código de Invitación (Para Clubes)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. COPA-GAF-2026 (Auto si queda vacío)"
-                  value={inviteCode}
-                  onChange={(e) => setInviteCode(e.target.value.toUpperCase())}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono uppercase focus:border-blue-600 focus:outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Código PIN de Jueces (Acceso Rápido)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. JUEZ-2026 (Auto si queda vacío)"
-                  value={judgeCode}
-                  onChange={(e) => setJudgeCode(e.target.value.toUpperCase())}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-mono uppercase focus:border-blue-600 focus:outline-none"
-                />
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-xs font-medium text-slate-700 mb-1">
-                  URL de Bases Técnicas (PDF / Documento)
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  URL de Bases Técnicas Oficiales (PDF)
                 </label>
                 <input
                   type="url"
-                  placeholder="https://ejemplo.com/bases-torneo-2026.pdf"
+                  placeholder="https://ejemplo.com/bases-torneo-paillaco-2026.pdf"
                   value={basesUrl}
                   onChange={(e) => setBasesUrl(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs focus:border-blue-600 focus:outline-none"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
                 />
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex justify-end gap-3 pt-3 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => setIsCreating(false)}
-                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-700 hover:bg-slate-50"
+                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 transition-colors"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="rounded-lg bg-blue-700 px-4 py-1.5 text-xs font-semibold text-white hover:bg-blue-800"
+                className="rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 px-5 py-2 text-xs font-black text-white hover:from-blue-500 hover:to-indigo-500 shadow-md shadow-blue-900/20 transition-all ring-1 ring-blue-400/30"
               >
-                Guardar Campeonato
+                Guardar Campeonato Oficial
               </button>
             </div>
           </form>

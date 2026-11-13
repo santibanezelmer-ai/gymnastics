@@ -16,6 +16,8 @@ import { LandingPage } from '@/features/landing/LandingPage'
 import { PublicChampionshipPortal } from '@/features/public-portal/PublicChampionshipPortal'
 import { PublicAthletesRoster } from '@/features/public-portal/PublicAthletesRoster'
 import { ClubDelegatesPortal } from '@/features/delegates/ClubDelegatesPortal'
+import { AdminDashboardOverview } from '@/features/dashboard/AdminDashboardOverview'
+import { ArenaTVDisplay } from '@/features/standings/ArenaTVDisplay'
 import { useRouter } from '@/lib/router'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -32,6 +34,7 @@ import {
   Calendar,
   BookOpen,
   Lock,
+  Tv,
 } from 'lucide-react'
 
 interface DashboardContentProps {
@@ -47,6 +50,7 @@ interface DashboardContentProps {
     | 'reports'
     | 'billing'
     | 'club_rotations'
+    | 'arena_tv'
 }
 
 const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTab = 'overview' }) => {
@@ -64,6 +68,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
     | 'reports'
     | 'billing'
     | 'club_rotations'
+    | 'arena_tv'
   >(initialTab)
 
   React.useEffect(() => {
@@ -160,6 +165,16 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
               >
                 <Lock className="h-3.5 w-3.5 text-indigo-600" />
                 <span className="hidden sm:inline">Rotaciones Club</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('arena_tv')}
+                title="Transmisión Oficial Arena TV para Pantallas de Estadio"
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-black text-emerald-800 hover:bg-emerald-100 transition-colors shadow-2xs"
+              >
+                <Tv className="h-3.5 w-3.5 text-emerald-600 animate-pulse" />
+                <span className="hidden sm:inline">Arena TV</span>
               </button>
             </div>
 
@@ -355,6 +370,19 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
                 <span>Result Book & Documentos</span>
               </button>
 
+              <button
+                type="button"
+                onClick={() => setActiveTab('arena_tv')}
+                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 font-semibold transition-all ${
+                  activeTab === 'arena_tv'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'
+                }`}
+              >
+                <Tv className="h-4 w-4" />
+                <span>Arena TV</span>
+              </button>
+
               {(activeRole === 'org_admin' || profile?.platformRole === 'platform_admin') && (
                 <button
                   type="button"
@@ -420,39 +448,14 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
 
             {/* TAB CONTENT: Scoped by active view & user role */}
             {activeTab === 'overview' && (
-              <div className="space-y-8">
-                {activeRole === 'org_admin' && (
-                  <div className="space-y-8">
-                    <ChampionshipsManager />
-                    <DelegationsManager />
-                    <LiveStandingsBoard />
-                  </div>
-                )}
+              <AdminDashboardOverview
+                onNavigateTab={(t) => setActiveTab(t)}
+                onOpenPublicPortal={(slug) => navigate(`/evento/${slug || 'artistica-paillaco-2026'}`)}
+              />
+            )}
 
-                {activeRole === 'head_judge' && (
-                  <div className="space-y-8">
-                    <HeadJudgeView />
-                    <div className="space-y-3">
-                      <h4 className="text-sm font-bold text-slate-900">Terminal de Jurado FIG & Rutinas Establecidas</h4>
-                      <ScoringPad />
-                    </div>
-                    <LiveStandingsBoard />
-                  </div>
-                )}
-
-                {activeRole === 'club_manager' && (
-                  <div className="space-y-8">
-                    <ClubManagerView onCreateChampionship={() => setActiveTab('championships')} />
-                    <LiveStandingsBoard />
-                  </div>
-                )}
-
-                {!['org_admin', 'head_judge', 'club_manager'].includes(activeRole || '') && (
-                  <div className="space-y-8">
-                    <LiveStandingsBoard />
-                  </div>
-                )}
-              </div>
+            {activeTab === 'arena_tv' && (
+              <ArenaTVDisplay onClose={() => setActiveTab('overview')} />
             )}
 
             {activeTab === 'championships' && <ChampionshipsManager />}
@@ -553,7 +556,18 @@ export const App: React.FC = () => {
     )
   }
 
-  // 4. RUTA GENERAL: Dashboard / Landing Page
+  // 4. RUTA ARENA TV: /arena o /tv (Transmisión para Pantallas Gigantes de Estadio)
+  if (route.path === '/arena' || route.path === '/tv') {
+    return (
+      <AuthProvider>
+        <OrganizationProvider>
+          <ArenaTVDisplay onClose={() => navigate('/')} />
+        </OrganizationProvider>
+      </AuthProvider>
+    )
+  }
+
+  // 5. RUTA GENERAL: Dashboard / Landing Page
   return (
     <AuthProvider>
       <OrganizationProvider>

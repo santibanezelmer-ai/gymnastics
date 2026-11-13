@@ -3,6 +3,8 @@ import { supabase } from '@/lib/supabase/client'
 import { calculateFigScore } from './scoringEngine'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Modal } from '@/components/ui/modal'
+import { Button } from '@/components/ui/button'
 import {
   Award,
   Send,
@@ -105,6 +107,7 @@ export const FastJudgeTerminal: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [showScoreConfirm, setShowScoreConfirm] = useState<boolean>(false)
 
   // Búsqueda Rápida por Dorsal (Bib) y Atajos Táctiles
   const [bibSearch, setBibSearch] = useState<string>('')
@@ -893,7 +896,54 @@ export const FastJudgeTerminal: React.FC = () => {
           </div>
         )}
 
-        {/* Scoring Grid */}
+          {/* Athlete Hero Header for Tablet Judges */}
+          {(() => {
+            const activeGymnast = gymnasts.find((g) => g.id === selectedRegId)
+            const activeApp = apparatuses.find((a) => a.id === selectedAppId)
+            if (!activeGymnast) return null
+
+            return (
+              <div className="mb-6 rounded-3xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-5 text-white border border-indigo-800/80 shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-amber-400 text-slate-950 font-black font-mono text-2xl sm:text-3xl shadow-lg ring-2 ring-amber-300/40">
+                    {activeGymnast.bib_number ? `#${activeGymnast.bib_number}` : 'S/N'}
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-md bg-indigo-700/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-200">
+                        {activeGymnast.category_name}
+                      </span>
+                      <span className="text-xs text-slate-300 font-semibold">
+                        {activeGymnast.club_name}
+                      </span>
+                    </div>
+                    <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white mt-1">
+                      {activeGymnast.gymnast_name}
+                    </h3>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-start sm:self-auto">
+                  <div className="rounded-2xl border border-indigo-700/60 bg-indigo-900/60 px-4 py-2 text-center">
+                    <span className="block text-[10px] uppercase font-bold text-indigo-300">Aparato</span>
+                    <span className="text-base font-black font-mono text-amber-400">
+                      {activeApp?.code || 'VT'}
+                    </span>
+                  </div>
+                  {activeApp?.code === 'VT' && (
+                    <div className="rounded-2xl border border-amber-500/60 bg-amber-950/40 px-4 py-2 text-center">
+                      <span className="block text-[10px] uppercase font-bold text-amber-300">Intento</span>
+                      <span className="text-base font-black font-mono text-amber-300">
+                        Salto {vaultAttempt}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })()}
+
+          {/* Scoring Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
           <div className="sm:col-span-2 space-y-4">
             {!isObligatory ? (
@@ -999,15 +1049,117 @@ export const FastJudgeTerminal: React.FC = () => {
             <button
               type="button"
               disabled={isSubmitting || !result || gymnasts.length === 0}
-              onClick={handleSubmitScore}
-              className="mt-4 w-full rounded-lg bg-indigo-700 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-indigo-800 disabled:opacity-50 transition-colors flex items-center justify-center gap-2"
+              onClick={() => setShowScoreConfirm(true)}
+              className="mt-4 w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-blue-600 py-3.5 text-xs sm:text-sm font-black text-white shadow-lg shadow-indigo-900/30 hover:from-indigo-500 hover:to-blue-500 disabled:opacity-50 transition-all flex items-center justify-center gap-2 ring-1 ring-indigo-400/30 active:scale-[0.99]"
             >
               <Send className="h-4 w-4" />
-              {isSubmitting ? 'Transmitiendo...' : 'Enviar a Mesa de Control'}
+              <span>Verificar y Enviar Puntuación</span>
             </button>
           </div>
         </div>
       </Card>
+
+      {/* MODAL DE CONFIRMACIÓN OBLIGATORIO ANTES DE TRANSMITIR OFICIALMENTE */}
+      <Modal
+        isOpen={showScoreConfirm}
+        onClose={() => setShowScoreConfirm(false)}
+        size="md"
+        title="Confirmación de Puntuación Oficial"
+        description="Revisa con atención los datos antes de transmitirlos a la Mesa de Control. Esta acción registra tu firma oficial de juez."
+      >
+        {result && (() => {
+          const activeGymnast = gymnasts.find((g) => g.id === selectedRegId)
+          const activeApp = apparatuses.find((a) => a.id === selectedAppId)
+
+          return (
+            <div className="space-y-5">
+              {/* Atleta Identificado */}
+              <div className="flex items-center gap-3.5 rounded-2xl bg-slate-900 p-4 text-white border border-slate-800">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl bg-amber-400 font-mono font-black text-2xl text-slate-950">
+                  {activeGymnast?.bib_number ? `#${activeGymnast.bib_number}` : 'S/N'}
+                </div>
+                <div>
+                  <h4 className="text-base font-black text-white">
+                    {activeGymnast?.gymnast_name}
+                  </h4>
+                  <p className="text-xs text-slate-400 font-medium">
+                    {activeGymnast?.club_name} · {activeGymnast?.category_name}
+                  </p>
+                  <div className="mt-1 flex items-center gap-2 text-xs font-mono font-bold text-indigo-300">
+                    <span>Aparato: {activeApp?.code || 'VT'}</span>
+                    {activeApp?.code === 'VT' && <span>(Salto {vaultAttempt})</span>}
+                  </div>
+                </div>
+              </div>
+
+              {/* Desglose Matemático FIG */}
+              <div className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 p-4 space-y-2 text-xs font-mono">
+                <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                  <span>Dificultad (Nota D):</span>
+                  <strong className="text-sm font-black text-slate-900 dark:text-white">
+                    {result.dScore.toFixed(3)}
+                  </strong>
+                </div>
+                <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                  <span>Papeletas de Ejecución (E1..E4):</span>
+                  <strong className="text-slate-900 dark:text-white">
+                    {result.eScoresRaw.map((n) => n.toFixed(1)).join(' | ')}
+                  </strong>
+                </div>
+                <div className="flex justify-between items-center text-slate-600 dark:text-slate-300">
+                  <span>Promedio de Ejecución (E):</span>
+                  <strong className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                    +{result.eScoreAverage.toFixed(3)}
+                  </strong>
+                </div>
+                {result.neutralDeductions > 0 && (
+                  <div className="flex justify-between items-center text-rose-600 dark:text-rose-400">
+                    <span>Penalizaciones Neutrales (ND):</span>
+                    <strong className="text-sm font-black">
+                      -{result.neutralDeductions.toFixed(3)}
+                    </strong>
+                  </div>
+                )}
+                <div className="border-t border-slate-200 dark:border-slate-800 pt-3 flex justify-between items-center">
+                  <span className="text-sm font-black uppercase text-slate-900 dark:text-white">
+                    PUNTUACIÓN FINAL OFICIAL:
+                  </span>
+                  <span className="text-2xl sm:text-3xl font-black text-indigo-600 dark:text-amber-400 tabular-nums">
+                    {result.finalScore.toFixed(3)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Botones de Acción Táctiles Grandes */}
+              <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="md"
+                  className="w-full sm:w-auto"
+                  onClick={() => setShowScoreConfirm(false)}
+                >
+                  Revisar y Corregir
+                </Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  size="md"
+                  className="w-full sm:w-auto"
+                  isLoading={isSubmitting}
+                  onClick={async () => {
+                    setShowScoreConfirm(false)
+                    await handleSubmitScore()
+                  }}
+                >
+                  <Send className="h-4 w-4 mr-1.5" />
+                  <span>Confirmar y Transmitir Oficial</span>
+                </Button>
+              </div>
+            </div>
+          )
+        })()}
+      </Modal>
     </div>
   )
 }
