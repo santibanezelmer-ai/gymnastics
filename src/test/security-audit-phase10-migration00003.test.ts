@@ -690,6 +690,8 @@ describe('OPERIX GYMNASTICS — Auditoría de Seguridad Migración 00003 (16 Esc
     // Dos envíos simultáneos
     const res1 = atomicUpsert(uniqueKey, 10.0, 9.1, 19.1);
     const res2 = atomicUpsert(uniqueKey, 10.0, 9.3, 19.3);
+    expect(res1.key).toBe(uniqueKey);
+    expect(res2.key).toBe(uniqueKey);
 
     // Debe existir exactamente 1 registro en la tabla, nunca 2 registros huérfanos
     expect(state.scoreDb.size).toBe(1);
