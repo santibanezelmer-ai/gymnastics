@@ -157,7 +157,7 @@ describe('FASE 21: Marketing Landing, Rutas y Solicitudes de Demo', () => {
       const routerCode = fs.readFileSync(routerFilePath, 'utf-8')
 
       expect(routerCode).toContain("cleanPath === '/eventos' || cleanPath === '/evento'")
-      expect(routerCode).toContain("path: '/eventos'")
+      expect(routerCode).toContain("path: '/evento'")
     })
 
     it('el componente PublicEventsDirectory debe existir y exportar la cartelera', () => {

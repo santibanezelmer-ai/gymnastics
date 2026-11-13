@@ -579,8 +579,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
 export const App: React.FC = () => {
   const { route, navigate } = useRouter()
 
-  // 1. RUTA CARTELERA PÚBLICA DE EVENTOS: /eventos o /evento sin slug
-  if (route.path === '/eventos') {
+  // 1. RUTA CARTELERA PÚBLICA DE EVENTOS: /evento o /eventos (sin slug)
+  if ((route.path === '/evento' || route.path === '/eventos') && !route.params.slug) {
     return (
       <AuthProvider>
         <OrganizationProvider>
@@ -593,16 +593,16 @@ export const App: React.FC = () => {
     )
   }
 
-  // 2. RUTA PÚBLICA: /evento/:slug (Portal Público del Campeonato)
-  if (route.path === '/evento') {
+  // 2. RUTA PÚBLICA: /evento/:slug o /eventos/:slug (Portal Público del Campeonato)
+  if ((route.path === '/evento' || route.path === '/eventos') && route.params.slug) {
     return (
       <AuthProvider>
         <OrganizationProvider>
           <PublicChampionshipPortal
-            slug={route.params.slug || 'artistica-paillaco-2026'}
+            slug={route.params.slug}
             onNavigateToDelegates={() => navigate('/club/rotaciones')}
             onNavigateHome={() => navigate('/')}
-            onNavigateToEvents={() => navigate('/eventos')}
+            onNavigateToEvents={() => navigate('/evento')}
           />
         </OrganizationProvider>
       </AuthProvider>

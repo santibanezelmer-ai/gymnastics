@@ -599,7 +599,7 @@ function Footer({ navigate }: MarketingLandingProps) {
         </div>
         <div className="grid content-start gap-1 text-[0.82rem]">
           <b className="mb-1 text-[0.68rem] text-white/50">Accesos</b>
-          <a href="/eventos" onClick={link('/eventos')} className="py-1 text-white/75 hover:text-white">
+          <a href="/evento" onClick={link('/evento')} className="py-1 text-white/75 hover:text-white">
             Cartelera de campeonatos
           </a>
           <a href="/club/rotaciones" onClick={link('/club/rotaciones')} className="py-1 text-white/75 hover:text-white">

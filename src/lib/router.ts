@@ -18,8 +18,8 @@ export interface RouteState {
 function parsePath(pathname: string): RouteState {
   const cleanPath = pathname.replace(/\/$/, '') || '/'
 
-  // 1. Match /evento/:slug (con slug especificado)
-  const eventMatch = cleanPath.match(/^\/evento\/([^/]+)/)
+  // 1. Match /evento/:slug o /eventos/:slug (con slug especificado) -> Portal Público del Campeonato
+  const eventMatch = cleanPath.match(/^\/(?:evento|eventos)\/([^/]+)/)
   if (eventMatch && eventMatch[1].trim()) {
     return {
       path: '/evento',
@@ -27,10 +27,10 @@ function parsePath(pathname: string): RouteState {
     }
   }
 
-  // 1.1 Match /eventos o /evento (sin slug) -> Cartelera pública de eventos
+  // 1.1 Match /eventos o /evento (sin slug) -> Cartelera pública unificada de eventos
   if (cleanPath === '/eventos' || cleanPath === '/evento') {
     return {
-      path: '/eventos',
+      path: '/evento',
       params: {},
     }
   }
