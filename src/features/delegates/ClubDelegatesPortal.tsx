@@ -119,27 +119,13 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
           setChampionships(mapped)
           setSelectedChampId(mapped[0].id)
         } else {
-          // Fallback con el campeonato oficial activo
-          const fallback: Championship = {
-            id: 'c2026000-0000-0000-0000-000000000001',
-            organizationId: 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
-            name: 'Campeonato Artística 2026 - Paillaco',
-            slug: 'artistica-paillaco-2026',
-            startDate: '2026-11-15',
-            endDate: '2026-11-15',
-            venueName: 'Gimnasio Municipal de Paillaco',
-            visibility: 'public',
-            status: 'in_progress',
-            rulesetVersion: 'FIG 2025-2028',
-            scoringSchemaVersion: '',
-            createdAt: '',
-            updatedAt: '',
-          }
-          setChampionships([fallback])
-          setSelectedChampId(fallback.id)
+          setChampionships([])
+          setSelectedChampId('')
         }
       } catch (err) {
         console.error('Error cargando campeonatos:', err)
+        setChampionships([])
+        setSelectedChampId('')
       }
     }
     loadChampionships()
@@ -299,75 +285,7 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
               }
             })
           } else {
-            // Datos locales controlados para simulación y verificación
-            if (clubCode === 'STADIO') {
-              athleteList = [
-                {
-                  registrationId: 'reg-s1',
-                  gymnastId: 'g-s1',
-                  fullName: 'Catalina Rivas',
-                  bibNumber: 201,
-                  categoryName: 'FIG Senior',
-                  discipline: 'GAF',
-                  subdivision: 'Subdivisión 1',
-                  rotationGroup: 'Grupo B',
-                  startingApparatus: 'UB',
-                  startOrder: 1,
-                },
-                {
-                  registrationId: 'reg-s2',
-                  gymnastId: 'g-s2',
-                  fullName: 'Francisca Ovalle',
-                  bibNumber: 202,
-                  categoryName: 'FIG Senior',
-                  discipline: 'GAF',
-                  subdivision: 'Subdivisión 1',
-                  rotationGroup: 'Grupo B',
-                  startingApparatus: 'UB',
-                  startOrder: 2,
-                },
-              ]
-            } else {
-              // Club Gimnástico Central (predeterminado)
-              athleteList = [
-                {
-                  registrationId: 'reg-1',
-                  gymnastId: 'g-1',
-                  fullName: 'Valentina Silva',
-                  bibNumber: 101,
-                  categoryName: 'FIG Senior',
-                  discipline: 'GAF',
-                  subdivision: 'Subdivisión 1',
-                  rotationGroup: 'Grupo A',
-                  startingApparatus: 'VT',
-                  startOrder: 1,
-                },
-                {
-                  registrationId: 'reg-2',
-                  gymnastId: 'g-2',
-                  fullName: 'Isidora Castro',
-                  bibNumber: 102,
-                  categoryName: 'FIG Senior',
-                  discipline: 'GAF',
-                  subdivision: 'Subdivisión 1',
-                  rotationGroup: 'Grupo A',
-                  startingApparatus: 'VT',
-                  startOrder: 2,
-                },
-                {
-                  registrationId: 'reg-3',
-                  gymnastId: 'g-3',
-                  fullName: 'Martina Morales',
-                  bibNumber: 103,
-                  categoryName: 'FIG Junior',
-                  discipline: 'GAF',
-                  subdivision: 'Subdivisión 1',
-                  rotationGroup: 'Grupo A',
-                  startingApparatus: 'VT',
-                  startOrder: 3,
-                },
-              ]
-            }
+            athleteList = []
           }
         }
 
@@ -691,8 +609,24 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
           </div>
         )}
 
-        {/* Métricas Resumen del Club */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        {gymnasts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-12 bg-slate-950 rounded-3xl border border-slate-800 text-center space-y-3">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+              <Clock className="h-7 w-7" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-white">
+                Aún no hay rotaciones oficiales asignadas para {clubName || 'este club'}
+              </h3>
+              <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                El comité técnico y la mesa de control están configurando el orden de paso y las subdivisiones del torneo. La programación de rotaciones aparecerá aquí tan pronto como sea publicada oficialmente.
+              </p>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Métricas Resumen del Club */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-1">
             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
               Gimnastas Inscritos
@@ -859,6 +793,8 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
             </table>
           </div>
         </div>
+          </>
+        )}
       </main>
 
       {/* Pie de Página */}

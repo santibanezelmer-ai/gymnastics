@@ -34,6 +34,7 @@ import {
   ShieldCheck,
   Info,
   AlertCircle,
+  Clock,
 } from 'lucide-react'
 import type { Championship } from '@/core/types/championship'
 
@@ -68,6 +69,15 @@ interface PublishedPodium {
   bronze?: { name: string; club: string; score: number }
 }
 
+export interface PublishedResultItem {
+  id: string
+  rank: number
+  gymnastName: string
+  clubName: string
+  categoryName: string
+  finalScore: number
+}
+
 export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> = ({
   slug = 'artistica-paillaco-2026',
   onNavigateToDelegates,
@@ -79,6 +89,7 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
   const [participatingClubs, setParticipatingClubs] = useState<ParticipatingClub[]>([])
   const [categories, setCategories] = useState<PublishedCategory[]>([])
   const [podiums, setPodiums] = useState<PublishedPodium[]>([])
+  const [publishedResults, setPublishedResults] = useState<PublishedResultItem[]>([])
   const [allChampionships, setAllChampionships] = useState<Championship[]>([])
   const [currentSlug, setCurrentSlug] = useState<string>(slug)
 
@@ -134,14 +145,7 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
               }))
             )
           } else {
-            // Categorías predeterminadas si no hay configuradas
-            setCategories([
-              { id: '1', name: 'FIG Senior (Élite)', discipline: 'GAF', gender: 'Femenino', scoringRegime: 'Libre FIG' },
-              { id: '2', name: 'FIG Junior (14-15 años)', discipline: 'GAF', gender: 'Femenino', scoringRegime: 'Libre FIG' },
-              { id: '3', name: 'Nivel 5 USAG Avanzado', discipline: 'GAF', gender: 'Femenino', scoringRegime: 'D Fija 10.0 + E' },
-              { id: '4', name: 'Nivel 4 Formativo', discipline: 'GAF', gender: 'Femenino', scoringRegime: 'D Fija 10.0 + E' },
-              { id: '5', name: 'Pre-Infantil Formativo', discipline: 'GAF', gender: 'Femenino', scoringRegime: 'Formativo' },
-            ])
+            setCategories([])
           }
 
           // Cargar clubes participantes autorizados (respetando privacidad)
@@ -165,11 +169,55 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
           } else {
             setParticipatingClubs([])
           }
+
+          // Cargar puntuaciones públicas oficiales aprobadas para este campeonato
+          try {
+            const { data: scoresData } = await supabase
+              .from('scores')
+              .select(`
+                id,
+                final_score,
+                registrations!inner (
+                  championship_id,
+                  gymnasts ( first_name, last_name ),
+                  clubs ( name ),
+                  categories ( name )
+                )
+              `)
+              .eq('registrations.championship_id', mapped.id)
+              .eq('status', 'official_approved')
+
+            if (scoresData && scoresData.length > 0) {
+              const mappedResults: PublishedResultItem[] = (scoresData as any[])
+                .map((row) => {
+                  const gym = row.registrations?.gymnasts
+                  const club = row.registrations?.clubs
+                  const cat = row.registrations?.categories
+                  return {
+                    id: row.id,
+                    rank: 0,
+                    gymnastName: gym ? `${gym.first_name} ${gym.last_name}` : 'Gimnasta',
+                    clubName: club?.name || 'Club',
+                    categoryName: cat?.name || 'General',
+                    finalScore: Number(row.final_score) || 0,
+                  }
+                })
+                .sort((a, b) => b.finalScore - a.finalScore)
+                .map((item, idx) => ({ ...item, rank: idx + 1 }))
+
+              setPublishedResults(mappedResults)
+            } else {
+              setPublishedResults([])
+            }
+          } catch {
+            setPublishedResults([])
+          }
         } else {
           // Si no se encuentra en Supabase por el slug exacto, marcar como no encontrado (404)
           setChampionship(null)
           setCategories([])
           setParticipatingClubs([])
+          setPublishedResults([])
         }
 
         // Podios oficiales (vacíos hasta que el jurado oficialice los resultados de pista)
@@ -677,71 +725,55 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
                     </span>
                   </div>
 
-                  {/* Tabla resumen pública */}
-                  <div className="overflow-x-auto rounded-xl border border-slate-800">
-                    <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 font-semibold">
-                        <tr>
-                          <th className="px-4 py-3">Puesto</th>
-                          <th className="px-4 py-3">Gimnasta</th>
-                          <th className="px-4 py-3">Club</th>
-                          <th className="px-4 py-3">Categoría</th>
-                          <th className="px-4 py-3 text-right">Nota Final</th>
-                          <th className="px-4 py-3 text-center">Estado</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800 bg-slate-900/40 text-slate-200">
-                        <tr>
-                          <td className="px-4 py-3 font-bold text-amber-400">🥇 1º</td>
-                          <td className="px-4 py-3 font-bold text-white">Valentina Silva</td>
-                          <td className="px-4 py-3 text-slate-300">Club Gimnástico Central</td>
-                          <td className="px-4 py-3 text-slate-400">FIG Senior</td>
-                          <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">52.850</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="rounded bg-emerald-950/80 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-800">
-                              Oficial
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-4 py-3 font-bold text-slate-300">🥈 2º</td>
-                          <td className="px-4 py-3 font-bold text-white">Catalina Rivas</td>
-                          <td className="px-4 py-3 text-slate-300">Stadio Italiano</td>
-                          <td className="px-4 py-3 text-slate-400">FIG Senior</td>
-                          <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">51.400</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="rounded bg-emerald-950/80 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-800">
-                              Oficial
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-4 py-3 font-bold text-amber-600">🥉 3º</td>
-                          <td className="px-4 py-3 font-bold text-white">Camila Muñoz</td>
-                          <td className="px-4 py-3 text-slate-300">Club Deportivo Alemán</td>
-                          <td className="px-4 py-3 text-slate-400">FIG Senior</td>
-                          <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">50.150</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="rounded bg-emerald-950/80 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-800">
-                              Oficial
-                            </span>
-                          </td>
-                        </tr>
-                        <tr>
-                          <td className="px-4 py-3 font-medium text-slate-400">4º</td>
-                          <td className="px-4 py-3 font-bold text-white">Sofía Herrera</td>
-                          <td className="px-4 py-3 text-slate-300">Asoc. Viña del Mar</td>
-                          <td className="px-4 py-3 text-slate-400">FIG Senior</td>
-                          <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">48.900</td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="rounded bg-emerald-950/80 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-800">
-                              Oficial
-                            </span>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
+                  {/* Tabla resumen pública o estado de espera */}
+                  {publishedResults.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center p-12 rounded-xl border border-slate-800 bg-slate-900/40 text-center space-y-3">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800 text-amber-400">
+                        <Clock className="h-6 w-6" />
+                      </div>
+                      <div>
+                        <h3 className="text-base font-bold text-white">Esperando las primeras puntuaciones oficiales</h3>
+                        <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                          Las clasificaciones y notas oficiales aparecerán aquí en cuanto sean validadas y aprobadas por el Juez Árbitro.
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto rounded-xl border border-slate-800">
+                      <table className="w-full text-left text-xs">
+                        <thead className="bg-slate-950 text-slate-400 border-b border-slate-800 font-semibold">
+                          <tr>
+                            <th className="px-4 py-3">Puesto</th>
+                            <th className="px-4 py-3">Gimnasta</th>
+                            <th className="px-4 py-3">Club</th>
+                            <th className="px-4 py-3">Categoría</th>
+                            <th className="px-4 py-3 text-right">Nota Final</th>
+                            <th className="px-4 py-3 text-center">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-800 bg-slate-900/40 text-slate-200">
+                          {publishedResults.map((r) => (
+                            <tr key={r.id}>
+                              <td className="px-4 py-3 font-bold text-white">
+                                {r.rank === 1 ? '🥇 1º' : r.rank === 2 ? '🥈 2º' : r.rank === 3 ? '🥉 3º' : `${r.rank}º`}
+                              </td>
+                              <td className="px-4 py-3 font-bold text-white">{r.gymnastName}</td>
+                              <td className="px-4 py-3 text-slate-300">{r.clubName}</td>
+                              <td className="px-4 py-3 text-slate-400">{r.categoryName}</td>
+                              <td className="px-4 py-3 text-right font-mono font-bold text-emerald-400">
+                                {r.finalScore.toFixed(3)}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="rounded bg-emerald-950/80 px-1.5 py-0.5 text-[10px] font-bold text-emerald-300 border border-emerald-800">
+                                  Oficial
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -761,69 +793,83 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {podiums.map((podium, idx) => (
-                    <div
-                      key={idx}
-                      className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 space-y-4 shadow-sm"
-                    >
-                      <div className="border-b border-slate-800 pb-3">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
-                          {podium.apparatusCode ? `Aparato ${podium.apparatusCode}` : 'General'}
-                        </span>
-                        <h3 className="text-sm font-black text-white leading-tight mt-0.5">
-                          {podium.categoryName}
-                        </h3>
-                      </div>
-
-                      {/* 1º Oro */}
-                      <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <span className="text-xl">🥇</span>
-                          <div>
-                            <p className="text-xs font-black text-white">{podium.gold.name}</p>
-                            <p className="text-[11px] text-amber-300/80">{podium.gold.club}</p>
-                          </div>
-                        </div>
-                        <span className="font-mono text-xs font-black text-amber-300">
-                          {podium.gold.score.toFixed(3)}
-                        </span>
-                      </div>
-
-                      {/* 2º Plata */}
-                      {podium.silver && (
-                        <div className="rounded-xl border border-slate-600/40 bg-slate-800/40 p-3 flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <span className="text-xl">🥈</span>
-                            <div>
-                              <p className="text-xs font-bold text-white">{podium.silver.name}</p>
-                              <p className="text-[11px] text-slate-400">{podium.silver.club}</p>
-                            </div>
-                          </div>
-                          <span className="font-mono text-xs font-bold text-slate-300">
-                            {podium.silver.score.toFixed(3)}
-                          </span>
-                        </div>
-                      )}
-
-                      {/* 3º Bronce */}
-                      {podium.bronze && (
-                        <div className="rounded-xl border border-amber-700/40 bg-amber-950/20 p-3 flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <span className="text-xl">🥉</span>
-                            <div>
-                              <p className="text-xs font-bold text-white">{podium.bronze.name}</p>
-                              <p className="text-[11px] text-amber-600/80">{podium.bronze.club}</p>
-                            </div>
-                          </div>
-                          <span className="font-mono text-xs font-bold text-amber-500">
-                            {podium.bronze.score.toFixed(3)}
-                          </span>
-                        </div>
-                      )}
+                {podiums.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center p-12 rounded-xl border border-slate-800 bg-slate-900/40 text-center space-y-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-800 text-amber-400">
+                      <Award className="h-6 w-6" />
                     </div>
-                  ))}
-                </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white">Ceremonias de premiación no iniciadas</h3>
+                      <p className="text-xs text-slate-400 max-w-md mx-auto mt-1">
+                        Los podios oficiales y medallero se publicarán al finalizar las subdivisiones de competición.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {podiums.map((podium, idx) => (
+                      <div
+                        key={idx}
+                        className="rounded-2xl border border-slate-800 bg-slate-900/80 p-5 space-y-4 shadow-sm"
+                      >
+                        <div className="border-b border-slate-800 pb-3">
+                          <span className="text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                            {podium.apparatusCode ? `Aparato ${podium.apparatusCode}` : 'General'}
+                          </span>
+                          <h3 className="text-sm font-black text-white leading-tight mt-0.5">
+                            {podium.categoryName}
+                          </h3>
+                        </div>
+
+                        {/* 1º Oro */}
+                        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <span className="text-xl">🥇</span>
+                            <div>
+                              <p className="text-xs font-black text-white">{podium.gold.name}</p>
+                              <p className="text-[11px] text-amber-300/80">{podium.gold.club}</p>
+                            </div>
+                          </div>
+                          <span className="font-mono text-xs font-black text-amber-300">
+                            {podium.gold.score.toFixed(3)}
+                          </span>
+                        </div>
+
+                        {/* 2º Plata */}
+                        {podium.silver && (
+                          <div className="rounded-xl border border-slate-600/40 bg-slate-800/40 p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-xl">🥈</span>
+                              <div>
+                                <p className="text-xs font-bold text-white">{podium.silver.name}</p>
+                                <p className="text-[11px] text-slate-400">{podium.silver.club}</p>
+                              </div>
+                            </div>
+                            <span className="font-mono text-xs font-bold text-slate-300">
+                              {podium.silver.score.toFixed(3)}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* 3º Bronce */}
+                        {podium.bronze && (
+                          <div className="rounded-xl border border-amber-700/40 bg-amber-950/20 p-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2.5">
+                              <span className="text-xl">🥉</span>
+                              <div>
+                                <p className="text-xs font-bold text-white">{podium.bronze.name}</p>
+                                <p className="text-[11px] text-amber-600/80">{podium.bronze.club}</p>
+                              </div>
+                            </div>
+                            <span className="font-mono text-xs font-bold text-amber-500">
+                              {podium.bronze.score.toFixed(3)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
           </div>

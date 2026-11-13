@@ -21,6 +21,9 @@ import {
   ChevronUp,
   Award,
   Users,
+  Clock,
+  AlertCircle,
+  RotateCw,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
@@ -30,6 +33,8 @@ export const LiveStandingsBoard: React.FC = () => {
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [scores, setScores] = useState<GymnastScoreEntry[]>([])
   const [isLiveConnected, setIsLiveConnected] = useState<boolean>(false)
+  const [isLoading, setIsLoading] = useState<boolean>(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   // 3-Way Design Mode Switcher: Standard Table, Olympic Podium, Arena / TV Display
   type ViewMode = 'standard' | 'podium' | 'arena'
@@ -54,6 +59,9 @@ export const LiveStandingsBoard: React.FC = () => {
   // 1. Fetch initial scores from Supabase
   const loadLiveScores = useCallback(async () => {
     try {
+      setIsLoading(true)
+      setLoadError(null)
+
       const { data, error } = await supabase
         .from('scores')
         .select(`
@@ -88,6 +96,8 @@ export const LiveStandingsBoard: React.FC = () => {
 
       if (error) {
         console.warn('Realtime fetch warning:', error.message)
+        setLoadError('No fue posible actualizar los resultados. Verifique su conexión.')
+        setScores([])
         return
       }
 
@@ -104,9 +114,9 @@ export const LiveStandingsBoard: React.FC = () => {
 
           const gymnastName = reg?.gymnasts
             ? `${reg.gymnasts.first_name} ${reg.gymnasts.last_name}`
-            : 'Camila Valenzuela'
-          const clubName = reg?.clubs?.name || 'Club Deportivo Manquehue'
-          const clubId = reg?.clubs?.id || 'club-manquehue'
+            : 'Gimnasta'
+          const clubName = reg?.clubs?.name || 'Club'
+          const clubId = reg?.clubs?.id || 'sin-club'
           const cat = reg?.categories
           const isOblig = cat?.scoring_regime === 'obligatory'
 
@@ -128,12 +138,14 @@ export const LiveStandingsBoard: React.FC = () => {
         })
         setScores(mapped)
       } else {
-        // Fallback demo data so the board is lively even before first entry
-        setScores(getDemoSeedScores())
+        setScores([])
       }
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Error fetching scores:', err)
-      setScores(getDemoSeedScores())
+      setLoadError('No fue posible actualizar los resultados. Verifique su conexión.')
+      setScores([])
+    } finally {
+      setIsLoading(false)
     }
   }, [])
 
@@ -366,61 +378,108 @@ export const LiveStandingsBoard: React.FC = () => {
         </div>
       )}
 
-      {/* -------------------- VIEW MODE 1: OLYMPIC PODIUM -------------------- */}
-      {viewMode === 'podium' && (
-        <div className="space-y-6">
-          {tab === 'all_around' && (
-            <OlympicPodiumAllAround
-              items={allAround}
-              expandedId={expandedGymnastId}
-              onToggleExpand={(id) => setExpandedGymnastId(expandedGymnastId === id ? null : id)}
-            />
-          )}
-          {tab === 'apparatus' && (
-            <OlympicPodiumApparatus
-              items={apparatusStandings}
-              apparatusCode={selectedApparatus}
-            />
-          )}
-          {tab === 'teams' && (
-            <OlympicPodiumTeams
-              teams={teamStandings}
-            />
-          )}
+      {/* -------------------- ESTADOS DE CARGA Y RESULTADOS -------------------- */}
+      {isLoading ? (
+        <div className={`flex flex-col items-center justify-center p-12 rounded-2xl border text-center space-y-3 ${isFullscreen ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-xs'}`}>
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-blue-50 text-blue-600 animate-spin">
+            <RotateCw className="h-6 w-6" />
+          </div>
+          <div>
+            <h4 className={`text-sm font-bold ${isFullscreen ? 'text-white' : 'text-slate-900'}`}>Cargando clasificaciones y resultados oficiales...</h4>
+            <p className={`text-xs mt-0.5 ${isFullscreen ? 'text-slate-400' : 'text-slate-500'}`}>Sincronizando notas validadas por el jurado FIG.</p>
+          </div>
         </div>
-      )}
-
-      {/* -------------------- VIEW MODE 2: ARENA / TV DISPLAY -------------------- */}
-      {viewMode === 'arena' && (
-        <ArenaLiveDisplay
-          tab={tab}
-          allAround={allAround}
-          apparatusStandings={apparatusStandings}
-          selectedApparatus={selectedApparatus}
-          teamStandings={teamStandings}
-          medalBadge={medalBadge}
-        />
-      )}
-
-      {/* -------------------- VIEW MODE 3: STANDARD HIGH-DENSITY TABLE -------------------- */}
-      {viewMode === 'standard' && (
+      ) : loadError ? (
+        <div className={`flex flex-col items-center justify-center p-8 rounded-2xl border text-center space-y-3 ${isFullscreen ? 'bg-rose-950/40 border-rose-900/60' : 'bg-rose-50/60 border-rose-200'}`}>
+          <div className="flex h-12 w-12 items-center justify-center rounded-full bg-rose-100 text-rose-600">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+          <div>
+            <h4 className={`text-sm font-bold ${isFullscreen ? 'text-rose-200' : 'text-rose-900'}`}>Error de Conexión</h4>
+            <p className={`text-xs mt-0.5 ${isFullscreen ? 'text-rose-300' : 'text-rose-700'}`}>{loadError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => loadLiveScores()}
+            className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700 transition-colors shadow-2xs cursor-pointer"
+          >
+            <RotateCw className="h-3.5 w-3.5" />
+            <span>Reintentar actualización</span>
+          </button>
+        </div>
+      ) : scores.length === 0 ? (
+        <div className={`flex flex-col items-center justify-center p-12 rounded-2xl border text-center space-y-3 ${isFullscreen ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-xs'}`}>
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-200/60">
+            <Clock className="h-7 w-7" />
+          </div>
+          <div>
+            <h4 className={`text-base font-bold ${isFullscreen ? 'text-white' : 'text-slate-900'}`}>Esperando las primeras puntuaciones oficiales</h4>
+            <p className={`text-xs max-w-md mx-auto mt-1 ${isFullscreen ? 'text-slate-400' : 'text-slate-500'}`}>
+              Aún no se han registrado o aprobado calificaciones en este campeonato. En cuanto los jueces califiquen y el Juez Árbitro apruebe las rutinas, las clasificaciones aparecerán aquí automáticamente en tiempo real.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono pt-2">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            Escuchando eventos en vivo por WebSocket
+          </div>
+        </div>
+      ) : (
         <>
-          {tab === 'all_around' && (
-            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
-                  <tr>
-                    <th className="px-4 py-3 font-semibold">Lugar</th>
-                    <th className="px-4 py-3 font-semibold">Gimnasta</th>
-                    <th className="px-4 py-3 font-semibold">Club / Delegación</th>
-                    <th className="px-4 py-3 font-semibold">Categoría</th>
-                    <th className="px-4 py-3 font-semibold text-center">VT</th>
-                    <th className="px-4 py-3 font-semibold text-center">UB</th>
-                    <th className="px-4 py-3 font-semibold text-center">BB</th>
-                    <th className="px-4 py-3 font-semibold text-center">FX</th>
-                    <th className="px-4 py-3 font-semibold text-right">Total AA</th>
-                  </tr>
-                </thead>
+          {/* -------------------- VIEW MODE 1: OLYMPIC PODIUM -------------------- */}
+          {viewMode === 'podium' && (
+            <div className="space-y-6">
+              {tab === 'all_around' && (
+                <OlympicPodiumAllAround
+                  items={allAround}
+                  expandedId={expandedGymnastId}
+                  onToggleExpand={(id) => setExpandedGymnastId(expandedGymnastId === id ? null : id)}
+                />
+              )}
+              {tab === 'apparatus' && (
+                <OlympicPodiumApparatus
+                  items={apparatusStandings}
+                  apparatusCode={selectedApparatus}
+                />
+              )}
+              {tab === 'teams' && (
+                <OlympicPodiumTeams
+                  teams={teamStandings}
+                />
+              )}
+            </div>
+          )}
+
+          {/* -------------------- VIEW MODE 2: ARENA / TV DISPLAY -------------------- */}
+          {viewMode === 'arena' && (
+            <ArenaLiveDisplay
+              tab={tab}
+              allAround={allAround}
+              apparatusStandings={apparatusStandings}
+              selectedApparatus={selectedApparatus}
+              teamStandings={teamStandings}
+              medalBadge={medalBadge}
+            />
+          )}
+
+          {/* -------------------- VIEW MODE 3: STANDARD HIGH-DENSITY TABLE -------------------- */}
+          {viewMode === 'standard' && (
+            <>
+              {tab === 'all_around' && (
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <table className="w-full text-left text-xs">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600">
+                      <tr>
+                        <th className="px-4 py-3 font-semibold">Lugar</th>
+                        <th className="px-4 py-3 font-semibold">Gimnasta</th>
+                        <th className="px-4 py-3 font-semibold">Club / Delegación</th>
+                        <th className="px-4 py-3 font-semibold">Categoría</th>
+                        <th className="px-4 py-3 font-semibold text-center">VT</th>
+                        <th className="px-4 py-3 font-semibold text-center">UB</th>
+                        <th className="px-4 py-3 font-semibold text-center">BB</th>
+                        <th className="px-4 py-3 font-semibold text-center">FX</th>
+                        <th className="px-4 py-3 font-semibold text-right">Total AA</th>
+                      </tr>
+                    </thead>
                 <tbody className="divide-y divide-slate-100 text-slate-700">
                   {allAround.map((row) => (
                     <tr key={row.gymnastId} className="hover:bg-slate-50/50">
@@ -558,6 +617,8 @@ export const LiveStandingsBoard: React.FC = () => {
               </table>
             </div>
           )}
+        </>
+      )}
         </>
       )}
     </div>
@@ -1212,150 +1273,4 @@ const ArenaLiveDisplay: React.FC<ArenaLiveDisplayProps> = ({
       )}
     </div>
   )
-}
-
-function getDemoSeedScores(): GymnastScoreEntry[] {
-  return [
-    {
-      gymnastId: 'g1',
-      gymnastName: 'Florencia Castro',
-      clubId: 'c1',
-      clubName: 'Club Estadio Italiano',
-      categoryId: 'cat-senior',
-      categoryName: 'FIG Senior',
-      scoringRegime: 'free',
-      apparatusCode: 'VT',
-      dScore: 5.2,
-      eScoreAvg: 8.7,
-      finalScore: 13.9,
-      status: 'official_approved',
-    },
-    {
-      gymnastId: 'g1',
-      gymnastName: 'Florencia Castro',
-      clubId: 'c1',
-      clubName: 'Club Estadio Italiano',
-      categoryId: 'cat-senior',
-      categoryName: 'FIG Senior',
-      scoringRegime: 'free',
-      apparatusCode: 'UB',
-      dScore: 4.9,
-      eScoreAvg: 8.2,
-      finalScore: 13.1,
-      status: 'official_approved',
-    },
-    {
-      gymnastId: 'g1',
-      gymnastName: 'Florencia Castro',
-      clubId: 'c1',
-      clubName: 'Club Estadio Italiano',
-      categoryId: 'cat-senior',
-      categoryName: 'FIG Senior',
-      scoringRegime: 'free',
-      apparatusCode: 'BB',
-      dScore: 5.1,
-      eScoreAvg: 8.3,
-      finalScore: 13.4,
-      status: 'official_approved',
-    },
-    {
-      gymnastId: 'g1',
-      gymnastName: 'Florencia Castro',
-      clubId: 'c1',
-      clubName: 'Club Estadio Italiano',
-      categoryId: 'cat-senior',
-      categoryName: 'FIG Senior',
-      scoringRegime: 'free',
-      apparatusCode: 'FX',
-      dScore: 5.3,
-      eScoreAvg: 8.4,
-      finalScore: 13.7,
-      status: 'official_approved',
-    },
-    {
-      gymnastId: 'g2',
-      gymnastName: 'Camila Valenzuela',
-      clubId: 'c2',
-      clubName: 'Club Deportivo Manquehue',
-      categoryId: 'cat-senior',
-      categoryName: 'FIG Senior',
-      scoringRegime: 'free',
-      apparatusCode: 'VT',
-      dScore: 5.0,
-      eScoreAvg: 8.6,
-      finalScore: 13.6,
-      status: 'official_approved',
-    },
-    {
-      gymnastId: 'g2',
-      gymnastName: 'Camila Valenzuela',
-      clubId: 'c2',
-      clubName: 'Club Deportivo Manquehue',
-      categoryId: 'cat-senior',
-      categoryName: 'FIG Senior',
-      scoringRegime: 'free',
-      apparatusCode: 'UB',
-      dScore: 5.2,
-      eScoreAvg: 8.4,
-      finalScore: 13.6,
-      status: 'official_approved',
-    },
-    {
-      gymnastId: 'g2',
-      gymnastName: 'Camila Valenzuela',
-      clubId: 'c2',
-      clubName: 'Club Deportivo Manquehue',
-      categoryId: 'cat-senior',
-      categoryName: 'FIG Senior',
-      scoringRegime: 'free',
-      apparatusCode: 'BB',
-      dScore: 4.8,
-      eScoreAvg: 8.2,
-      finalScore: 13.0,
-      status: 'official_approved',
-    },
-    {
-      gymnastId: 'g2',
-      gymnastName: 'Camila Valenzuela',
-      clubId: 'c2',
-      clubName: 'Club Deportivo Manquehue',
-      categoryId: 'cat-senior',
-      categoryName: 'FIG Senior',
-      scoringRegime: 'free',
-      apparatusCode: 'FX',
-      dScore: 5.1,
-      eScoreAvg: 8.3,
-      finalScore: 13.4,
-      status: 'official_approved',
-    },
-    // Nivel Obligatorio (Rutina Establecida - D fija 10.000)
-    {
-      gymnastId: 'g3',
-      gymnastName: 'Martina Rojas',
-      clubId: 'c2',
-      clubName: 'Club Deportivo Manquehue',
-      categoryId: 'cat-usag3',
-      categoryName: 'Nivel 3 USAG',
-      scoringRegime: 'obligatory',
-      apparatusCode: 'VT',
-      dScore: 10.0,
-      eScoreAvg: 8.9,
-      finalScore: 18.9,
-      status: 'official_approved',
-    },
-    {
-      gymnastId: 'g3',
-      gymnastName: 'Martina Rojas',
-      clubId: 'c2',
-      clubName: 'Club Deportivo Manquehue',
-      categoryId: 'cat-usag3',
-      categoryName: 'Nivel 3 USAG',
-      scoringRegime: 'obligatory',
-      apparatusCode: 'UB',
-      dScore: 10.0,
-      eScoreAvg: 8.7,
-      finalScore: 18.7,
-      status: 'official_approved',
-    },
-  ]
 }
