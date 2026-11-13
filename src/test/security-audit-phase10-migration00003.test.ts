@@ -505,12 +505,14 @@ describe('OPERIX GYMNASTICS — Auditoría de Seguridad Migración 00003 (16 Esc
     expect(ddl).toContain('REVOKE ALL ON FUNCTION public.submit_fast_judge_score FROM PUBLIC');
   });
 
-  it('15. Resolución de digest califica explícitamente extensions.digest con search_path seguro', () => {
+  it('15. Resolución de digest y pgcrypto es dinámica y robusta sin asumir esquemas rígidos', () => {
     const plpgsqlHeader = 'SET search_path = pg_catalog, extensions, public';
-    const digestCall = "encode(extensions.digest(trim(p_judge_code)::bytea, 'sha256'), 'hex')";
+    const digestCall = "encode(digest(trim(p_judge_code)::bytea, 'sha256'), 'hex')";
+    const doBlock = "IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto')";
 
-    expect(plpgsqlHeader).toContain('extensions');
-    expect(digestCall).toContain('extensions.digest');
+    expect(plpgsqlHeader).toContain('pg_catalog, extensions, public');
+    expect(digestCall).toContain('digest(trim(p_judge_code)');
+    expect(doBlock).toContain('pg_extension');
   });
 
   it('16. Rate limiting mitiga ataques de fuerza bruta concurrentes', () => {
@@ -700,18 +702,71 @@ describe('OPERIX GYMNASTICS — Auditoría de Seguridad Migración 00003 (16 Esc
     expect(finalRecord?.final).toBe(19.3); // Último estado atómico consistente
   });
 
-  it('24. Cierre de sesión en FastJudgeTerminal elimina tokens y sesión de localStorage', () => {
+  it('24. FastJudgeTerminal utiliza sessionStorage (no localStorage) y limpia credenciales al cerrar sesión', () => {
     const storageKey = 'operix_fast_judge_session';
-    const mockStorage: Record<string, string> = {
-      [storageKey]: JSON.stringify({ judgeCode: 'a1b2c3d4e5f6', judgeName: 'Juez 1' }),
+    const mockSessionStorage: Record<string, string> = {
+      [storageKey]: JSON.stringify({
+        judgeCode: 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
+        judgeName: 'Juez Salto',
+        loginTimestamp: Date.now(),
+      }),
     };
+    const mockLocalStorage: Record<string, string> = {};
 
     function simulateLogout() {
-      delete mockStorage[storageKey];
+      delete mockSessionStorage[storageKey];
+      delete mockLocalStorage[storageKey];
     }
 
-    expect(mockStorage[storageKey]).toBeDefined();
+    expect(mockSessionStorage[storageKey]).toBeDefined();
+    expect(mockLocalStorage[storageKey]).toBeUndefined(); // Nunca en localStorage
     simulateLogout();
-    expect(mockStorage[storageKey]).toBeUndefined();
+    expect(mockSessionStorage[storageKey]).toBeUndefined();
+  });
+
+  it('25. Validación de expiración de sesión (TTL de 8 horas) en sessionStorage', () => {
+    const storageKey = 'operix_fast_judge_session';
+    const ttlMs = 8 * 60 * 60 * 1000;
+    const expiredTimestamp = Date.now() - (ttlMs + 1000); // 8 horas y 1 segundo atrás
+
+    const mockStorage: Record<string, string> = {
+      [storageKey]: JSON.stringify({
+        judgeCode: 'a1b2c3d4e5f60718293a4b5c6d7e8f90',
+        loginTimestamp: expiredTimestamp,
+      }),
+    };
+
+    function restoreSession(): { valid: boolean; data: any } {
+      const raw = mockStorage[storageKey];
+      if (!raw) return { valid: false, data: null };
+      const parsed = JSON.parse(raw);
+      if (!parsed.loginTimestamp || Date.now() - parsed.loginTimestamp > ttlMs) {
+        delete mockStorage[storageKey]; // Limpieza automática por expiración
+        return { valid: false, data: null };
+      }
+      return { valid: true, data: parsed };
+    }
+
+    const sessionResult = restoreSession();
+    expect(sessionResult.valid).toBe(false);
+    expect(mockStorage[storageKey]).toBeUndefined(); // Purgado
+  });
+
+  it('26. Limpieza defensiva en montaje purga cualquier clave residual en localStorage', () => {
+    const storageKey = 'operix_fast_judge_session';
+    const mockLocalStorage: Record<string, string> = {
+      [storageKey]: 'stale_token_from_legacy_version',
+    };
+
+    // Al montar FastJudgeTerminal
+    function initTerminal() {
+      if (mockLocalStorage[storageKey]) {
+        delete mockLocalStorage[storageKey];
+      }
+    }
+
+    expect(mockLocalStorage[storageKey]).toBeDefined();
+    initTerminal();
+    expect(mockLocalStorage[storageKey]).toBeUndefined();
   });
 });

@@ -14,12 +14,16 @@ import {
   LogOut,
 } from 'lucide-react'
 
+const FAST_JUDGE_STORAGE_KEY = 'operix_fast_judge_session'
+const FAST_JUDGE_SESSION_TTL_MS = 8 * 60 * 60 * 1000 // 8 horas (jornada máxima de competición)
+
 interface FastJudgeSession {
   judgeCode: string
   judgeName: string
   apparatusCode: string
   championshipId: string
   championshipName: string
+  loginTimestamp: number
 }
 
 interface LoadedGymnastOption {
@@ -41,8 +45,31 @@ interface LoadedApparatus {
 
 export const FastJudgeTerminal: React.FC = () => {
   const [session, setSession] = useState<FastJudgeSession | null>(() => {
-    const saved = localStorage.getItem('operix_fast_judge_session')
-    return saved ? JSON.parse(saved) : null
+    // 1. Limpieza defensiva de localStorage histórico
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(FAST_JUDGE_STORAGE_KEY)
+    }
+
+    // 2. Recuperación efímera y segura exclusivamente desde sessionStorage
+    if (typeof window === 'undefined' || !window.sessionStorage) return null
+    try {
+      const saved = window.sessionStorage.getItem(FAST_JUDGE_STORAGE_KEY)
+      if (!saved) return null
+      const parsed = JSON.parse(saved) as FastJudgeSession
+
+      // Validación de expiración de sesión (TTL)
+      if (
+        !parsed.loginTimestamp ||
+        Date.now() - parsed.loginTimestamp > FAST_JUDGE_SESSION_TTL_MS
+      ) {
+        window.sessionStorage.removeItem(FAST_JUDGE_STORAGE_KEY)
+        return null
+      }
+      return parsed
+    } catch {
+      window.sessionStorage.removeItem(FAST_JUDGE_STORAGE_KEY)
+      return null
+    }
   })
 
   // Fast Login form fields
@@ -84,7 +111,7 @@ export const FastJudgeTerminal: React.FC = () => {
 
       if (error) throw error
       if (!data || !data.championship) {
-        throw new Error('Código de juez o campeonato no encontrado.')
+        throw new Error('Código de juez o campeonato no válido o no encontrado.')
       }
 
       const champ = data.championship
@@ -106,17 +133,34 @@ export const FastJudgeTerminal: React.FC = () => {
 
       return champ
     } catch (err: unknown) {
-      setLoginError((err as Error).message)
+      const errMsg = (err as Error).message || ''
+      const safeErrorMsg =
+        errMsg.includes('violat') || errMsg.includes('Token') || errMsg.includes('no encontrado')
+          ? 'Código o token de juez no válido o expirado.'
+          : errMsg
+      setLoginError(safeErrorMsg)
       return null
     } finally {
       setIsVerifying(false)
     }
   }
 
-  // Restore session on mount
+  // Restore session on mount con verificación de vigencia en backend
   useEffect(() => {
+    let isMounted = true
     if (session) {
-      loadChampionshipData(session.judgeCode)
+      loadChampionshipData(session.judgeCode).then((champ) => {
+        if (!champ && isMounted) {
+          // Token revocado, expirado en backend o inválido: limpieza inmediata
+          setSession(null)
+          sessionStorage.removeItem(FAST_JUDGE_STORAGE_KEY)
+          localStorage.removeItem(FAST_JUDGE_STORAGE_KEY)
+          setLoginError('La sesión del jurado ha expirado o las credenciales fueron revocadas.')
+        }
+      })
+    }
+    return () => {
+      isMounted = false
     }
   }, [])
 
@@ -146,17 +190,23 @@ export const FastJudgeTerminal: React.FC = () => {
         apparatusCode: 'VT',
         championshipId: champ.id,
         championshipName: champ.name,
+        loginTimestamp: Date.now(),
       }
       setSession(newSession)
-      localStorage.setItem('operix_fast_judge_session', JSON.stringify(newSession))
+      sessionStorage.setItem(FAST_JUDGE_STORAGE_KEY, JSON.stringify(newSession))
+      localStorage.removeItem(FAST_JUDGE_STORAGE_KEY) // Asegurar ausencia en localStorage
     }
   }
 
   const handleLogout = () => {
     setSession(null)
-    localStorage.removeItem('operix_fast_judge_session')
+    sessionStorage.removeItem(FAST_JUDGE_STORAGE_KEY)
+    localStorage.removeItem(FAST_JUDGE_STORAGE_KEY)
     setInputCode('')
     setInputName('')
+    setSubmitSuccess(null)
+    setSubmitError(null)
+    setLoginError(null)
   }
 
   // Pure FIG calculation
@@ -218,7 +268,17 @@ export const FastJudgeTerminal: React.FC = () => {
         setVaultAttempt(2)
       }
     } catch (err: unknown) {
-      setSubmitError((err as Error).message)
+      const rawError = (err as Error).message || ''
+      if (
+        rawError.includes('Token de juez no válido') ||
+        rawError.includes('Token de juez') ||
+        rawError.includes('no autorizado')
+      ) {
+        handleLogout()
+        setLoginError('Su sesión ha expirado o las credenciales del jurado fueron revocadas.')
+      } else {
+        setSubmitError(rawError)
+      }
     } finally {
       setIsSubmitting(false)
     }

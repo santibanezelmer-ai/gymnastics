@@ -11,9 +11,20 @@
 BEGIN;
 
 -- ----------------------------------------------------------------------------
--- FASE 1: EXTENSIÓN PGCRYPTO Y RESOLUCIÓN DE ESQUEMAS
+-- FASE 1: EXTENSIÓN PGCRYPTO Y RESOLUCIÓN ROBUSTA DE ESQUEMAS
 -- ----------------------------------------------------------------------------
-CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
+-- No asumir un esquema fijo ni duplicar/fallar si pgcrypto ya existe en otro esquema.
+-- En Supabase suele residir en 'extensions', pero en algunas instancias preexistentes está en 'public'.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto') THEN
+    IF EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'extensions') THEN
+      CREATE EXTENSION pgcrypto WITH SCHEMA extensions;
+    ELSE
+      CREATE EXTENSION pgcrypto WITH SCHEMA public;
+    END IF;
+  END IF;
+END $$;
 
 -- ----------------------------------------------------------------------------
 -- FASE 2: TABLA DE TOKENS CRIPTOGRÁFICOS DE ALTA ENTROPÍA
@@ -122,7 +133,8 @@ BEGIN
     RAISE EXCEPTION 'OPERIX_SECURITY_VIOLATION: Token de juez inválido.';
   END IF;
 
-  v_input_hash := encode(extensions.digest(trim(p_judge_code)::bytea, 'sha256'), 'hex');
+  -- Cálculo dinámico y seguro de SHA-256 (resuelto vía search_path: pg_catalog, extensions, public)
+  v_input_hash := encode(digest(trim(p_judge_code)::bytea, 'sha256'), 'hex');
 
   -- Consultar estado del campeonato
   SELECT status, organization_id
@@ -456,7 +468,8 @@ BEGIN
     RETURN NULL;
   END IF;
 
-  v_input_hash := encode(extensions.digest(trim(p_code)::bytea, 'sha256'), 'hex');
+  -- Cálculo dinámico y seguro de SHA-256 (resuelto vía search_path: pg_catalog, extensions, public)
+  v_input_hash := encode(digest(trim(p_code)::bytea, 'sha256'), 'hex');
 
   -- Buscar campeonato ÚNICAMENTE por token hash de tipo 'judge' activo y vigente
   SELECT c.id, c.organization_id, c.name, c.slug, c.description, c.start_date, c.end_date,
