@@ -88,6 +88,20 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
     ? roleBadgeStyles[activeRole]
     : { label: activeRole || 'Sin Rol', variant: 'outline' }
 
+  // Cuando no hay sesión de usuario, presentar directamente la Landing Page Comercial Rediseñada
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-blue-600 selection:text-white px-4 sm:px-6 py-6 sm:py-8">
+        <div className="mx-auto max-w-7xl">
+          <LandingPage
+            onOpenPublicPortal={(slug) => navigate(`/evento/${slug || 'artistica-paillaco-2026'}`)}
+            onOpenClubRotations={() => navigate('/club/rotaciones')}
+          />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* Top Navigation Header */}
@@ -362,13 +376,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
 
       {/* Main Content Viewport */}
       <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
-        {!user ? (
-          <LandingPage
-            onOpenPublicPortal={(slug) => navigate(`/evento/${slug || 'artistica-paillaco-2026'}`)}
-            onOpenClubRotations={() => navigate('/club/rotaciones')}
-          />
-        ) : (
-          <div className="space-y-6 sm:space-y-8">
+        <div className="space-y-6 sm:space-y-8">
             {/* Modern Organization Command Center Banner */}
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-r from-white via-slate-50/70 to-blue-50/20 p-5 sm:p-6 shadow-xs">
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -483,7 +491,6 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
             {activeTab === 'reports' && <ReportsManager />}
             {activeTab === 'billing' && <SubscriptionPlansView />}
           </div>
-        )}
       </main>
 
       {/* Platform Global Footer */}
