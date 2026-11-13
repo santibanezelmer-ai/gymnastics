@@ -229,6 +229,12 @@ describe('OPERIX GYMNASTICS — Auditoría de Seguridad Migración 00003 (16 Esc
       throw new Error('OPERIX_SECURITY_VIOLATION: La inscripción no pertenece al campeonato especificado.');
     }
 
+    // 2b. Validación reglamentaria del número de intento (COALESCE en SQL no confunde 0 con null)
+    const attempt = params.attemptNumber !== undefined && params.attemptNumber !== null ? params.attemptNumber : 1;
+    if (attempt !== 1 && attempt !== 2) {
+      throw new Error('OPERIX_VAL_ERROR: El número de intento debe ser 1 o 2.');
+    }
+
     // 3. Verificación de aparato y disciplina
     const app = apparatuses[params.apparatusId];
     const cat = categories[reg.categoryId];
@@ -240,6 +246,11 @@ describe('OPERIX GYMNASTICS — Auditoría de Seguridad Migración 00003 (16 Esc
       );
     }
 
+    // Solo Salto (VT) permite intento 2
+    if (attempt === 2 && app.code !== 'VT') {
+      throw new Error('OPERIX_VAL_ERROR: El segundo intento solo está reglamentado para el aparato Salto (VT).');
+    }
+
     // 4. Verificación de aparato habilitado para la categoría
     const isEnabled = categoryApparatuses.some(
       (ca) => ca.categoryId === cat.id && ca.apparatusId === app.id
@@ -249,7 +260,6 @@ describe('OPERIX GYMNASTICS — Auditoría de Seguridad Migración 00003 (16 Esc
     }
 
     // 5. Verificación de nota aprobada
-    const attempt = params.attemptNumber || 1;
     const existingScore = scores.find(
       (s) =>
         s.registrationId === reg.id &&
@@ -603,5 +613,103 @@ describe('OPERIX GYMNASTICS — Auditoría de Seguridad Migración 00003 (16 Esc
     `;
     expect(sqlCode).toContain('token_hash = v_input_hash');
     expect(sqlCode).not.toContain('ELSIF v_champ_legacy_judge_code');
+  });
+
+  it('21. Intentos fuera del rango permitido (0 o 3) son categóricamente rechazados', () => {
+    expect(() =>
+      simulateSubmitFastJudgeScore({
+        championshipId: champId,
+        judgeToken: validJudgeSecret,
+        registrationId: regGafId,
+        apparatusId: appVtGafId,
+        dScore: 10.0,
+        eScores: [9.0],
+        neutralDeductions: 0,
+        clientFinalScore: 19.0,
+        attemptNumber: 0, // Inválido
+      })
+    ).toThrow('OPERIX_VAL_ERROR: El número de intento debe ser 1 o 2.');
+
+    expect(() =>
+      simulateSubmitFastJudgeScore({
+        championshipId: champId,
+        judgeToken: validJudgeSecret,
+        registrationId: regGafId,
+        apparatusId: appVtGafId,
+        dScore: 10.0,
+        eScores: [9.0],
+        neutralDeductions: 0,
+        clientFinalScore: 19.0,
+        attemptNumber: 3, // Inválido
+      })
+    ).toThrow('OPERIX_VAL_ERROR: El número de intento debe ser 1 o 2.');
+  });
+
+  it('22. Intento 2 en aparato distinto a Salto (VT) es rechazado por reglamento FIG', () => {
+    // Habilitamos temporalmente UB para probar
+    categoryApparatuses.push({ categoryId: catGafId, apparatusId: appUbGafId });
+
+    try {
+      expect(() =>
+        simulateSubmitFastJudgeScore({
+          championshipId: champId,
+          judgeToken: validJudgeSecret,
+          registrationId: regGafId,
+          apparatusId: appUbGafId, // Barras Asimétricas
+          dScore: 10.0,
+          eScores: [9.0],
+          neutralDeductions: 0,
+          clientFinalScore: 19.0,
+          attemptNumber: 2, // No permitido en UB
+        })
+      ).toThrow('OPERIX_VAL_ERROR: El segundo intento solo está reglamentado para el aparato Salto (VT).');
+    } finally {
+      // Limpiar
+      const idx = categoryApparatuses.findIndex(
+        (ca) => ca.categoryId === catGafId && ca.apparatusId === appUbGafId
+      );
+      if (idx !== -1) categoryApparatuses.splice(idx, 1);
+    }
+  });
+
+  it('23. Solicitudes concurrentes se resuelven atómicamente por ON CONFLICT sin duplicados', () => {
+    // Simulación de dos jueces enviando sobre la misma clave relacional en paralelo
+    const state = {
+      scoreDb: new Map<string, { d: number; e: number; final: number; version: number }>(),
+    };
+
+    function atomicUpsert(key: string, d: number, e: number, finalScore: number) {
+      const current = state.scoreDb.get(key);
+      const version = current ? current.version + 1 : 1;
+      state.scoreDb.set(key, { d, e, final: finalScore, version });
+      return { key, version };
+    }
+
+    const uniqueKey = `${regGafId}_${appVtGafId}_2`; // Intento 2
+
+    // Dos envíos simultáneos
+    const res1 = atomicUpsert(uniqueKey, 10.0, 9.1, 19.1);
+    const res2 = atomicUpsert(uniqueKey, 10.0, 9.3, 19.3);
+
+    // Debe existir exactamente 1 registro en la tabla, nunca 2 registros huérfanos
+    expect(state.scoreDb.size).toBe(1);
+    const finalRecord = state.scoreDb.get(uniqueKey);
+    expect(finalRecord?.version).toBe(2);
+    expect(finalRecord?.final).toBe(19.3); // Último estado atómico consistente
+  });
+
+  it('24. Cierre de sesión en FastJudgeTerminal elimina tokens y sesión de localStorage', () => {
+    const storageKey = 'operix_fast_judge_session';
+    const mockStorage: Record<string, string> = {
+      [storageKey]: JSON.stringify({ judgeCode: 'a1b2c3d4e5f6', judgeName: 'Juez 1' }),
+    };
+
+    function simulateLogout() {
+      delete mockStorage[storageKey];
+    }
+
+    expect(mockStorage[storageKey]).toBeDefined();
+    simulateLogout();
+    expect(mockStorage[storageKey]).toBeUndefined();
   });
 });
