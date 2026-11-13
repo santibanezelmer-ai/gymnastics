@@ -113,6 +113,63 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
     )
   }
 
+  // Si el usuario no pertenece a la organización organizadora del torneo (es un Delegado de Club),
+  // se le presenta de forma exclusiva y aislada el Portal de Delegaciones de Club.
+  // Evita mezclar información y funciones de la organización del campeonato con los clubes participantes.
+  if (user && !activeOrganization && profile?.platformRole !== 'platform_admin') {
+    return (
+      <div className="min-h-screen bg-slate-900 text-slate-100 font-sans antialiased">
+        <header className="border-b border-slate-800 bg-slate-950/95 sticky top-0 z-40 px-4 sm:px-6 py-3 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-blue-700 via-blue-600 to-indigo-600 text-white shadow-sm ring-1 ring-blue-500/20">
+              <Trophy className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-black tracking-tight text-white">Operix Gymnastics</h1>
+                <Badge variant="success" className="text-[10px] py-0 px-1.5 font-bold">Portal Delegación</Badge>
+              </div>
+              <p className="text-[11px] text-slate-400 font-medium hidden sm:block">
+                Acceso Oficial para Clubes & Entrenadores
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => navigate('/evento/artistica-paillaco-2026')}
+              className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-bold text-slate-300 hover:text-white hover:bg-slate-800 transition-colors"
+            >
+              <Trophy className="h-3.5 w-3.5 text-blue-400" />
+              <span className="hidden sm:inline">Portal Público</span>
+            </button>
+            <div className="text-right hidden sm:block border-l border-slate-800 pl-3">
+              <p className="text-xs font-bold text-white leading-tight truncate max-w-[150px]">
+                {profile?.fullName || user.email}
+              </p>
+              <span className="text-[10px] text-slate-400 font-mono">Delegado de Club</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => signOut()}
+              title="Cerrar Sesión"
+              className="rounded-xl border border-slate-800 p-2 text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        </header>
+
+        <main className="mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8">
+          <ClubDelegatesPortal
+            onNavigateToPublic={(slug) => navigate(`/evento/${slug}`)}
+            onNavigateHome={() => navigate('/')}
+          />
+        </main>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 font-sans antialiased selection:bg-blue-600 selection:text-white">
       {/* Top Navigation Header */}

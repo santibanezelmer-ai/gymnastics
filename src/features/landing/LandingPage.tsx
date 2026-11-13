@@ -124,7 +124,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
             <div className="flex items-center gap-2">
               <span className="text-xs font-semibold text-slate-400">Módulo Activo:</span>
               <Badge variant="default" className="text-[10px] font-bold bg-blue-600 text-white">
-                {activeView === 'login' && 'Ingreso de Organizadores & Delegados'}
+                {activeView === 'login' && 'Acceso Organización del Campeonato'}
                 {activeView === 'fast_judge' && 'Terminal Rápida de Juez en Pista'}
                 {activeView === 'live_standings' && 'Tablero en Vivo de Resultados'}
               </Badge>
@@ -139,16 +139,16 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 activeView === 'login' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
               }`}
             >
-              Acceso Cuenta
+              Organización
             </button>
             {onOpenClubRotations && (
               <button
                 type="button"
                 onClick={onOpenClubRotations}
-                className="hidden xl:inline-flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-900/80 px-3 py-1.5 text-xs font-bold text-slate-200 hover:bg-slate-800 hover:text-white transition-all shadow-xs"
+                className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-700/60 bg-indigo-950/60 px-3 py-1 text-xs font-bold text-indigo-200 hover:bg-indigo-900 hover:text-white transition-all shadow-xs"
               >
-                <Lock className="h-3.5 w-3.5 text-slate-400" />
-                <span>Portal Club</span>
+                <Lock className="h-3.5 w-3.5 text-indigo-400" />
+                <span>Portal Clubes</span>
               </button>
             )}
 

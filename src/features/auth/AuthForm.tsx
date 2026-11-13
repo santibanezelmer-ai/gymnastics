@@ -141,44 +141,6 @@ export const AuthForm: React.FC = () => {
           {isSignUp ? 'Inicia sesión' : 'Regístrate aquí'}
         </button>
       </div>
-
-      {/* Selector de Acceso Rápido para Clubes de Paillaco 2026 */}
-      <div className="mt-6 border-t border-slate-200 pt-5">
-        <span className="block text-center text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-3">
-          Cuentas Oficiales de Clubes (Paillaco 2026)
-        </span>
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-          {[
-            { label: 'Pumahue', email: 'pumahue@operix.app' },
-            { label: 'Big Bang', email: 'bigbang@operix.app' },
-            { label: 'Claude Gay', email: 'claudegay@operix.app' },
-            { label: 'Felmer N.', email: 'felmer@operix.app' },
-            { label: 'Ainilebu', email: 'ainilebu@operix.app' },
-            { label: 'Acrodan', email: 'acrodan@operix.app' },
-            { label: 'Olimpo', email: 'olimpo@operix.app' },
-            { label: 'Élevé', email: 'eleve@operix.app' },
-            { label: 'Paillaco', email: 'paillaco@operix.app' },
-          ].map((club) => (
-            <button
-              key={club.email}
-              type="button"
-              onClick={() => {
-                setIsSignUp(false)
-                setEmail(club.email)
-                setPassword('Operix2026!')
-                setErrorMsg(null)
-              }}
-              className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 text-[11px] font-medium text-slate-700 hover:bg-blue-50 hover:border-blue-300 hover:text-blue-700 transition-all text-left shadow-2xs"
-            >
-              <span className="truncate">{club.label}</span>
-              <span className="text-[9px] font-mono text-slate-400">Rápido</span>
-            </button>
-          ))}
-        </div>
-        <p className="mt-2 text-center text-[10px] text-slate-400">
-          Contraseña predeterminada: <code className="font-mono font-bold text-slate-600">Operix2026!</code>
-        </p>
-      </div>
     </Card>
   )
 }

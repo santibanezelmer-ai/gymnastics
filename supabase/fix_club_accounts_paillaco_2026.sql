@@ -1,19 +1,18 @@
 -- ==============================================================================
--- FIX DEFINITIVO: CUENTAS DE CLUBES PAILLACO 2026
+-- FIX DEFINITIVO: CUENTAS DE CLUBES PARTICIPANTES (PAILLACO 2026)
 -- Desarrollado por Comercial Hels SpA
 --
--- Resuelve:
--- 1. "ERROR 23505: duplicate key value violates unique constraint profiles_pkey"
---    (Haciendo resiliente la función handle_new_user con ON CONFLICT y limpiando
---    registros existentes en el orden correcto de dependencias).
--- 2. "500: Database error querying schema" en GoTrue
---    (Completando todos los campos de tokens con cadenas vacías '' en vez de NULL).
+-- PRINCIPIOS DE AISLAMIENTO:
+-- 1. Los clubes participantes NO son la organización del campeonato.
+--    No tienen membresía en public.organization_members de la organización organizadora.
+-- 2. Pertenecen exclusivamente a public.club_members vinculados a su club.
+-- 3. Resuelve 'ERROR 23505: duplicate key' mediante ON CONFLICT en public.profiles y handle_new_user.
+-- 4. Resuelve 'Database error querying schema' en GoTrue inicializando tokens con '' en vez de NULL.
 -- ==============================================================================
 
 BEGIN;
 
 -- 1. Actualizar la función trigger handle_new_user para que sea idempotente
---    y nunca lance un conflicto de clave primaria en public.profiles
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -38,7 +37,7 @@ BEGIN
 END;
 $$;
 
--- 2. Limpieza exhaustiva en orden de claves foráneas para los 9 clubes
+-- 2. Limpieza exhaustiva de los 9 clubes para evitar duplicados o estados inconsistentes
 DELETE FROM public.club_members WHERE user_id IN (
   'e0000000-0000-0000-0000-000000000010', 'e0000000-0000-0000-0000-000000000020',
   'e0000000-0000-0000-0000-000000000030', 'e0000000-0000-0000-0000-000000000040',
@@ -47,6 +46,7 @@ DELETE FROM public.club_members WHERE user_id IN (
   'e0000000-0000-0000-0000-000000000090'
 );
 
+-- IMPORTANTE: Eliminar de organization_members para NO mezclar clubes con la organización del campeonato
 DELETE FROM public.organization_members WHERE user_id IN (
   'e0000000-0000-0000-0000-000000000010', 'e0000000-0000-0000-0000-000000000020',
   'e0000000-0000-0000-0000-000000000030', 'e0000000-0000-0000-0000-000000000040',
@@ -83,7 +83,7 @@ DELETE FROM auth.users WHERE id IN (
   'olimpo@operix.app', 'eleve@operix.app', 'paillaco@operix.app'
 );
 
--- 3. Insertar usuarios con campos 100% compatibles con GoTrue (sin NULLs en tokens)
+-- 3. Insertar usuarios de delegaciones con campos canónicos compatibles con GoTrue
 INSERT INTO auth.users (
   id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
   invited_at, confirmation_token, confirmation_sent_at, recovery_token,
@@ -104,7 +104,7 @@ INSERT INTO auth.users (
   ('e0000000-0000-0000-0000-000000000080', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'eleve@operix.app', crypt('Operix2026!', gen_salt('bf')), now(), NULL, '', NULL, '', NULL, '', '', NULL, now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Delegado Club Élevé Los Lagos"}', false, now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL, false, NULL),
   ('e0000000-0000-0000-0000-000000000090', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'paillaco@operix.app', crypt('Operix2026!', gen_salt('bf')), now(), NULL, '', NULL, '', NULL, '', '', NULL, now(), '{"provider":"email","providers":["email"]}', '{"full_name":"Delegado Gimnástico Paillaco"}', false, now(), now(), NULL, NULL, '', '', NULL, '', 0, NULL, '', NULL, false, NULL);
 
--- 4. Crear identidades requeridas por GoTrue
+-- 4. Identidades requeridas por el proveedor email
 INSERT INTO auth.identities (
   id, user_id, identity_data, provider, provider_id, last_sign_in_at, created_at, updated_at
 ) VALUES
@@ -121,7 +121,7 @@ ON CONFLICT (provider, provider_id) DO UPDATE SET
   identity_data = EXCLUDED.identity_data,
   updated_at = now();
 
--- 5. Asegurar datos completos en public.profiles
+-- 5. Perfiles públicos (rol de plataforma 'none' para evitar accesos administrativos)
 INSERT INTO public.profiles (id, email, full_name, platform_role) VALUES
   ('e0000000-0000-0000-0000-000000000010', 'pumahue@operix.app', 'Delegado Club Pumahue', 'none'),
   ('e0000000-0000-0000-0000-000000000020', 'bigbang@operix.app', 'Delegado Club Big Bang', 'none'),
@@ -137,22 +137,8 @@ ON CONFLICT (id) DO UPDATE SET
   full_name = EXCLUDED.full_name,
   updated_at = now();
 
--- 6. Asignar membresía organizacional
-INSERT INTO public.organization_members (organization_id, user_id, role, is_active) VALUES
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'e0000000-0000-0000-0000-000000000010', 'club_manager', true),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'e0000000-0000-0000-0000-000000000020', 'club_manager', true),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'e0000000-0000-0000-0000-000000000030', 'club_manager', true),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'e0000000-0000-0000-0000-000000000040', 'club_manager', true),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'e0000000-0000-0000-0000-000000000050', 'club_manager', true),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'e0000000-0000-0000-0000-000000000060', 'club_manager', true),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'e0000000-0000-0000-0000-000000000070', 'club_manager', true),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'e0000000-0000-0000-0000-000000000080', 'club_manager', true),
-  ('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'e0000000-0000-0000-0000-000000000090', 'club_manager', true)
-ON CONFLICT (organization_id, user_id) DO UPDATE SET
-  role = 'club_manager',
-  is_active = true;
-
--- 7. Vincular en public.club_members con su club respectivo
+-- 6. ASOCIACIÓN ESTRICTA Y EXCLUSIVA A SUS CLUBES EN public.club_members
+--    (Cero permisos de organización para garantizar que no vean la gestión del torneo)
 INSERT INTO public.club_members (club_id, user_id, role) VALUES
   ('c2026000-0000-0000-0000-000000000010', 'e0000000-0000-0000-0000-000000000010', 'manager'),
   ('c2026000-0000-0000-0000-000000000020', 'e0000000-0000-0000-0000-000000000020', 'manager'),

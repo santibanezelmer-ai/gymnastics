@@ -97,11 +97,18 @@ function Nav({ navigate }: MarketingLandingProps) {
         </div>
         <div className="flex items-center gap-3">
           <a
+            href="/club/rotaciones"
+            onClick={link('/club/rotaciones')}
+            className="hidden text-[0.8rem] font-semibold text-blue-400 hover:text-blue-300 lg:inline"
+          >
+            Portal Clubes
+          </a>
+          <a
             href="/ingresar"
             onClick={link('/ingresar')}
             className="hidden text-[0.8rem] font-semibold opacity-75 hover:opacity-100 lg:inline"
           >
-            Ingresar
+            Organización
           </a>
           <a href="#contacto" className="ox-btn ox-btn-primary ox-btn-small max-sm:hidden">
             Solicita una demo
@@ -134,8 +141,11 @@ function Nav({ navigate }: MarketingLandingProps) {
               <ArrowRight className="h-4 w-4 text-ox-ink-500" />
             </a>
           ))}
+          <a href="/club/rotaciones" onClick={link('/club/rotaciones')} className="flex min-h-12 items-center px-3 font-semibold text-blue-400">
+            Portal Clubes (Delegaciones)
+          </a>
           <a href="/ingresar" onClick={link('/ingresar')} className="flex min-h-12 items-center px-3 font-semibold">
-            Ingresar
+            Acceso Organización
           </a>
           <a href="#contacto" onClick={() => setOpen(false)} className="ox-btn ox-btn-primary mt-2">
             Solicita una demo
@@ -592,14 +602,14 @@ function Footer({ navigate }: MarketingLandingProps) {
           <a href="/eventos" onClick={link('/eventos')} className="py-1 text-white/75 hover:text-white">
             Cartelera de campeonatos
           </a>
+          <a href="/club/rotaciones" onClick={link('/club/rotaciones')} className="py-1 text-white/75 hover:text-white">
+            Portal de Clubes (Delegaciones)
+          </a>
           <a href="/ingresar" onClick={link('/ingresar')} className="py-1 text-white/75 hover:text-white">
-            Ingresar
+            Acceso Organización
           </a>
           <a href="/juez" onClick={link('/juez')} className="py-1 text-white/75 hover:text-white">
             Juez con PIN
-          </a>
-          <a href="/club/rotaciones" onClick={link('/club/rotaciones')} className="py-1 text-white/75 hover:text-white">
-            Rotaciones de mi club
           </a>
         </div>
         <div className="grid content-start gap-1 text-[0.82rem]">
