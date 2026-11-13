@@ -46,7 +46,7 @@ export const AuthForm: React.FC = () => {
   }
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="w-full max-w-md mx-auto bg-white text-slate-900 border-slate-200 shadow-xl p-6 sm:p-8">
       <div className="flex items-center gap-3 mb-6">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
           {isSignUp ? <UserPlus className="h-5 w-5" /> : <LogIn className="h-5 w-5" />}
@@ -78,32 +78,32 @@ export const AuthForm: React.FC = () => {
       <form onSubmit={handleSubmit} className="space-y-4">
         {isSignUp && (
           <div>
-            <label className="block text-xs font-medium text-slate-700 mb-1">Nombre Completo</label>
+            <label className="block text-xs font-semibold text-slate-700 mb-1">Nombre Completo</label>
             <input
               type="text"
               required
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Ej. María González"
-              className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
+              className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-100 shadow-2xs transition-all"
             />
           </div>
         )}
 
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">Correo Electrónico</label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">Correo Electrónico</label>
           <input
             type="email"
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="usuario@dominio.com"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
+            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-100 shadow-2xs transition-all"
           />
         </div>
 
         <div>
-          <label className="block text-xs font-medium text-slate-700 mb-1">Contraseña</label>
+          <label className="block text-xs font-semibold text-slate-700 mb-1">Contraseña</label>
           <input
             type="password"
             required
@@ -111,14 +111,14 @@ export const AuthForm: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
-            className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-600 focus:outline-none"
+            className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-100 shadow-2xs transition-all"
           />
         </div>
 
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full rounded-lg bg-blue-700 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-800 disabled:opacity-50 transition-colors"
+          className="w-full rounded-lg bg-blue-700 py-3 text-sm font-bold text-white shadow-sm hover:bg-blue-800 disabled:opacity-50 transition-colors cursor-pointer"
         >
           {isLoading ? 'Procesando...' : isSignUp ? 'Registrarse' : 'Iniciar Sesión'}
         </button>
