@@ -14,6 +14,7 @@ import { ReportsManager } from '@/features/reports/ReportsManager'
 import { AwardsManager } from '@/features/awards/AwardsManager'
 import { LandingPage } from '@/features/landing/LandingPage'
 import { PublicChampionshipPortal } from '@/features/public-portal/PublicChampionshipPortal'
+import { PublicAthletesRoster } from '@/features/public-portal/PublicAthletesRoster'
 import { ClubDelegatesPortal } from '@/features/delegates/ClubDelegatesPortal'
 import { useRouter } from '@/lib/router'
 import { Badge } from '@/components/ui/badge'
@@ -55,6 +56,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
     | 'overview'
     | 'championships'
     | 'delegations'
+    | 'athletes'
     | 'judging'
     | 'schedule'
     | 'standings'
@@ -114,7 +116,7 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
 
           {/* User Controls, Portals & Tenant Switcher */}
           <div className="flex items-center gap-3">
-            {/* Quick Links: Portal Público y Rotaciones de Club */}
+            {/* Quick Links: Portal Público, Nómina y Rotaciones de Club */}
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -124,6 +126,16 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
               >
                 <Trophy className="h-3.5 w-3.5 text-blue-600" />
                 <span className="hidden sm:inline">Portal Público</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('athletes')}
+                title="Consultar Nómina Oficial de 153 Gimnastas (GAM y GAF)"
+                className="flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/80 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors shadow-2xs"
+              >
+                <Users className="h-3.5 w-3.5 text-emerald-600" />
+                <span className="hidden sm:inline">Nómina (153)</span>
               </button>
 
               <button
@@ -259,6 +271,19 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
                   <span>{activeRole === 'head_judge' ? 'Consola Juez Árbitro' : 'Mesa de Jurado FIG'}</span>
                 </button>
               )}
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('athletes')}
+                className={`flex items-center gap-2 rounded-lg px-3 py-1.5 font-semibold transition-all ${
+                  activeTab === 'athletes'
+                    ? 'bg-blue-700 text-white shadow-xs'
+                    : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'
+                }`}
+              >
+                <Users className="h-4 w-4" />
+                <span>Nómina Deportistas (153)</span>
+              </button>
 
               <button
                 type="button"
@@ -423,6 +448,16 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
             )}
 
             {activeTab === 'championships' && <ChampionshipsManager />}
+            {activeTab === 'athletes' && (
+              <div className="space-y-6">
+                <PublicAthletesRoster
+                  theme="light"
+                  title="Nómina Oficial de Deportistas — Paillaco 2026"
+                  subtitle="153 gimnastas inscritos y acreditados oficialmente: 16 GAM (Varones) y 137 GAF (Damas) de 10 clubes"
+                  showHeroStats={true}
+                />
+              </div>
+            )}
             {activeTab === 'delegations' && (
               activeRole === 'club_manager' ? (
                 <ClubManagerView onCreateChampionship={() => setActiveTab('championships')} />

@@ -26,9 +26,10 @@ import {
   RotateCw,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { PublicAthletesRoster } from '@/features/public-portal/PublicAthletesRoster'
 
 export const LiveStandingsBoard: React.FC = () => {
-  const [tab, setTab] = useState<'all_around' | 'apparatus' | 'teams'>('all_around')
+  const [tab, setTab] = useState<'all_around' | 'apparatus' | 'teams' | 'startlist'>('all_around')
   const [selectedApparatus, setSelectedApparatus] = useState<string>('VT')
   const [selectedCategory, setSelectedCategory] = useState<string>('')
   const [scores, setScores] = useState<GymnastScoreEntry[]>([])
@@ -351,6 +352,16 @@ export const LiveStandingsBoard: React.FC = () => {
               >
                 Por Equipos
               </button>
+              <button
+                type="button"
+                onClick={() => setTab('startlist')}
+                className={`rounded-md px-3 py-1 font-semibold transition-colors flex items-center gap-1.5 ${
+                  tab === 'startlist' ? 'bg-blue-700 text-white' : isFullscreen ? 'text-slate-400 hover:text-white' : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Users className="h-3.5 w-3.5" />
+                <span>Startlist en Pista (153)</span>
+              </button>
             </div>
           </div>
         </div>
@@ -408,20 +419,41 @@ export const LiveStandingsBoard: React.FC = () => {
           </button>
         </div>
       ) : scores.length === 0 ? (
-        <div className={`flex flex-col items-center justify-center p-12 rounded-2xl border text-center space-y-3 ${isFullscreen ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-xs'}`}>
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-200/60">
-            <Clock className="h-7 w-7" />
+        <div className="space-y-6">
+          <div className={`flex flex-col items-center justify-center p-8 sm:p-12 rounded-2xl border text-center space-y-3 ${isFullscreen ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200 shadow-xs'}`}>
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-200/60">
+              <Clock className="h-7 w-7" />
+            </div>
+            <div>
+              <h4 className={`text-base font-bold ${isFullscreen ? 'text-white' : 'text-slate-900'}`}>Esperando las primeras puntuaciones oficiales</h4>
+              <p className={`text-xs max-w-md mx-auto mt-1 ${isFullscreen ? 'text-slate-400' : 'text-slate-500'}`}>
+                Aún no se han registrado o aprobado calificaciones en este campeonato. En cuanto los jueces califiquen y el Juez Árbitro apruebe las rutinas, las clasificaciones aparecerán aquí automáticamente en tiempo real.
+              </p>
+            </div>
+            <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono pt-2">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              Escuchando eventos en vivo por WebSocket · Startlist oficial en pista a continuación
+            </div>
           </div>
-          <div>
-            <h4 className={`text-base font-bold ${isFullscreen ? 'text-white' : 'text-slate-900'}`}>Esperando las primeras puntuaciones oficiales</h4>
-            <p className={`text-xs max-w-md mx-auto mt-1 ${isFullscreen ? 'text-slate-400' : 'text-slate-500'}`}>
-              Aún no se han registrado o aprobado calificaciones en este campeonato. En cuanto los jueces califiquen y el Juez Árbitro apruebe las rutinas, las clasificaciones aparecerán aquí automáticamente en tiempo real.
-            </p>
+
+          {/* Startlist oficial de 153 deportistas (16 GAM · 137 GAF) */}
+          <div className="pt-2">
+            <PublicAthletesRoster
+              theme={isFullscreen ? 'dark' : 'light'}
+              title="Startlist Oficial: 153 Gimnastas en Competencia"
+              subtitle="Nómina oficial de competidores acreditados: 16 GAM (Varones) y 137 GAF (Damas) de 10 clubes"
+              showHeroStats={true}
+            />
           </div>
-          <div className="flex items-center gap-2 text-[11px] text-slate-400 font-mono pt-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            Escuchando eventos en vivo por WebSocket
-          </div>
+        </div>
+      ) : tab === 'startlist' ? (
+        <div className="pt-2">
+          <PublicAthletesRoster
+            theme={isFullscreen ? 'dark' : 'light'}
+            title="Startlist Oficial: 153 Gimnastas en Competencia"
+            subtitle="Nómina oficial de competidores acreditados: 16 GAM (Varones) y 137 GAF (Damas) de 10 clubes"
+            showHeroStats={true}
+          />
         </div>
       ) : (
         <>

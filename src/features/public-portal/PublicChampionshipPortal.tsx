@@ -19,6 +19,7 @@
 import React, { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
+import { PublicAthletesRoster } from './PublicAthletesRoster'
 import {
   Trophy,
   Calendar,
@@ -83,11 +84,12 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
   onNavigateToDelegates,
   onNavigateHome,
 }) => {
-  const [activeTab, setActiveTab] = useState<'info' | 'clubs' | 'results' | 'podiums'>('info')
+  const [activeTab, setActiveTab] = useState<'info' | 'athletes' | 'clubs' | 'results' | 'podiums'>('info')
   const [isLoading, setIsLoading] = useState(true)
   const [championship, setChampionship] = useState<Championship | null>(null)
   const [participatingClubs, setParticipatingClubs] = useState<ParticipatingClub[]>([])
   const [categories, setCategories] = useState<PublishedCategory[]>([])
+  const [totalAthletesCount, setTotalAthletesCount] = useState<number>(0)
   const [podiums, setPodiums] = useState<PublishedPodium[]>([])
   const [publishedResults, setPublishedResults] = useState<PublishedResultItem[]>([])
   const [allChampionships, setAllChampionships] = useState<Championship[]>([])
@@ -148,22 +150,42 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
             setCategories([])
           }
 
-          // Cargar clubes participantes autorizados (respetando privacidad)
-          // Se consulta la lista pública de clubes inscritos sin exponer datos privados de atletas
+          // Cargar clubes participantes autorizados y contabilizar gimnastas inscritos
+          const { data: regCounts } = await supabase
+            .from('registrations')
+            .select('id, club_id')
+            .eq('championship_id', mapped.id)
+
+          const countsMap: Record<string, number> = {}
+          let totalAthletes = 0
+          if (regCounts && regCounts.length > 0) {
+            totalAthletes = regCounts.length
+            regCounts.forEach((r) => {
+              if (r.club_id) {
+                countsMap[r.club_id] = (countsMap[r.club_id] || 0) + 1
+              }
+            })
+          }
+          setTotalAthletesCount(totalAthletes)
+
           const { data: clubsData } = await supabase
             .from('clubs')
             .select('id, name, code, city, country')
             .order('name', { ascending: true })
 
           if (clubsData && clubsData.length > 0) {
+            // Filtrar únicamente los clubes que tienen delegación inscrita en este campeonato (o todos si es general)
+            const activeClubs = clubsData.filter((cl) => countsMap[cl.id] !== undefined || totalAthletes === 0)
+            const clubsToDisplay = activeClubs.length > 0 ? activeClubs : clubsData
+
             setParticipatingClubs(
-              clubsData.map((cl) => ({
+              clubsToDisplay.map((cl) => ({
                 id: cl.id,
                 name: cl.name,
                 code: cl.code,
                 city: cl.city || 'Chile',
                 country: cl.country || 'Chile',
-                gymnastCount: 0,
+                gymnastCount: countsMap[cl.id] || 0,
               }))
             )
           } else {
@@ -460,7 +482,7 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
       </header>
 
       {/* ---------------------------------------------------------------------
-          NAVIGATION TABS (INFORMACIÓN GENERAL / CLUBES / RESULTADOS / PODIOS)
+          NAVIGATION TABS (INFORMACIÓN / NÓMINA DEPORTISTAS / CLUBES / RESULTADOS / PODIOS)
           --------------------------------------------------------------------- */}
       <div className="border-b border-slate-800 bg-slate-950 sticky top-[57px] z-40">
         <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 sm:px-6 overflow-x-auto py-2 scrollbar-none">
@@ -475,6 +497,19 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
           >
             <Info className="h-4 w-4" />
             <span>Información & Convocatoria</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('athletes')}
+            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all ${
+              activeTab === 'athletes'
+                ? 'bg-blue-600 text-white shadow-sm'
+                : 'text-slate-400 hover:bg-slate-900 hover:text-white'
+            }`}
+          >
+            <Users className="h-4 w-4 text-blue-300" />
+            <span>Nómina de Deportistas ({totalAthletesCount > 0 ? totalAthletesCount : '153'})</span>
           </button>
 
           <button
@@ -656,8 +691,46 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
                       </button>
                     )}
                   </div>
+
+                  {/* Acceso Rápido a Nómina Oficial de Gimnastas */}
+                  <div className="rounded-2xl border border-indigo-900/50 bg-gradient-to-br from-indigo-950/40 to-slate-900 p-6 space-y-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400 border border-indigo-500/30">
+                        <Users className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white">Nómina Oficial de Deportistas</h3>
+                        <p className="text-[11px] text-indigo-300">153 atletas acreditados (16 GAM · 137 GAF)</p>
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Consulta la lista completa de gimnastas inscritos, dorsales #Bib, niveles deportivos y clubes representados en gimnasia masculina y femenina.
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('athletes')}
+                      className="flex items-center justify-center gap-2 w-full rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2.5 text-xs font-bold transition-all shadow-md shadow-indigo-900/30"
+                    >
+                      <Users className="h-4 w-4" />
+                      <span>Ver Nómina Completa de Deportistas</span>
+                    </button>
+                  </div>
                 </div>
               </div>
+            )}
+
+            {/* NÓMINA OFICIAL DE DEPORTISTAS (153 ATLETAS: 16 GAM · 137 GAF) */}
+            {activeTab === 'athletes' && (
+              <PublicAthletesRoster
+                championshipId={championship?.id}
+                championshipSlug={currentSlug}
+                theme="dark"
+                title={`Nómina Oficial de Deportistas — ${championship?.name || 'Paillaco 2026'}`}
+                subtitle="153 gimnastas inscritos y acreditados oficialmente: 16 GAM (Varones) y 137 GAF (Damas) de 10 clubes"
+                showHeroStats={true}
+              />
             )}
 
             {/* 2. CLUBES PARTICIPANTES */}
