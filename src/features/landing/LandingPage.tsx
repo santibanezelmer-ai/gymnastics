@@ -58,12 +58,15 @@ export interface LandingPageProps {
   initialMode?: 'landing' | 'login' | 'fast_judge' | 'live_standings'
   onOpenPublicPortal?: (slug?: string) => void
   onOpenClubRotations?: () => void
+  /** Si se entrega, "Volver al Inicio" lleva a la landing de marketing en vez de la vista interna. */
+  onBackHome?: () => void
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
   initialMode = 'landing',
   onOpenPublicPortal,
   onOpenClubRotations,
+  onBackHome,
 }) => {
   const [activeView, setActiveView] = useState<'landing' | 'login' | 'fast_judge' | 'live_standings'>(initialMode)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -112,7 +115,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setActiveView('landing')}
+              onClick={() => (onBackHome ? onBackHome() : setActiveView('landing'))}
               className="flex items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-700 transition-colors shadow-2xs"
             >
               ← Volver al Portal Comercial

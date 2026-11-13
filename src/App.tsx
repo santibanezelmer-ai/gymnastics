@@ -12,7 +12,8 @@ import { SubscriptionPlansView } from '@/features/billing/SubscriptionPlansView'
 import { CompetitionScheduleView } from '@/features/schedule/CompetitionScheduleView'
 import { ReportsManager } from '@/features/reports/ReportsManager'
 import { AwardsManager } from '@/features/awards/AwardsManager'
-import { LandingPage } from '@/features/landing/LandingPage'
+import { LandingPage, type LandingPageProps } from '@/features/landing/LandingPage'
+import { MarketingLanding } from '@/features/marketing/MarketingLanding'
 import { PublicChampionshipPortal } from '@/features/public-portal/PublicChampionshipPortal'
 import { PublicAthletesRoster } from '@/features/public-portal/PublicAthletesRoster'
 import { ClubDelegatesPortal } from '@/features/delegates/ClubDelegatesPortal'
@@ -51,9 +52,11 @@ interface DashboardContentProps {
     | 'billing'
     | 'club_rotations'
     | 'arena_tv'
+  /** Vista inicial de la puerta de acceso cuando no hay sesión (login, juez con PIN, en vivo). */
+  landingMode?: LandingPageProps['initialMode']
 }
 
-const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTab = 'overview' }) => {
+const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTab = 'overview', landingMode }) => {
   const { user, profile, signOut, signInDevAdmin } = useAuth()
   const { activeOrganization, activeRole, organizations } = useOrganization()
   const [activeTab, setActiveTab] = useState<
@@ -99,6 +102,8 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
       <div className="min-h-screen bg-slate-950 text-slate-100 font-sans antialiased selection:bg-blue-600 selection:text-white px-4 sm:px-6 py-6 sm:py-8">
         <div className="mx-auto max-w-7xl">
           <LandingPage
+            initialMode={landingMode}
+            onBackHome={landingMode ? () => navigate('/') : undefined}
             onOpenPublicPortal={(slug) => navigate(`/evento/${slug || 'artistica-paillaco-2026'}`)}
             onOpenClubRotations={() => navigate('/club/rotaciones')}
           />
@@ -567,14 +572,39 @@ export const App: React.FC = () => {
     )
   }
 
-  // 5. RUTA GENERAL: Dashboard / Landing Page
+  // 5. ACCESOS DIRECTOS: /ingresar, /juez, /en-vivo (puerta de acceso sin sesión)
+  const gateModes: Record<string, LandingPageProps['initialMode']> = {
+    '/ingresar': 'login',
+    '/juez': 'fast_judge',
+    '/en-vivo': 'live_standings',
+  }
+  if (route.path in gateModes) {
+    return (
+      <AuthProvider>
+        <OrganizationProvider>
+          <DashboardContent navigate={navigate} landingMode={gateModes[route.path]} />
+        </OrganizationProvider>
+      </AuthProvider>
+    )
+  }
+
+  // 6. RUTA GENERAL: landing de marketing sin sesión, panel con sesión
   return (
     <AuthProvider>
       <OrganizationProvider>
-        <DashboardContent navigate={navigate} />
+        <HomeRoute navigate={navigate} />
       </OrganizationProvider>
     </AuthProvider>
   )
+}
+
+/** En "/" muestra la landing de marketing a visitantes y el panel a usuarios con sesión. */
+const HomeRoute: React.FC<{ navigate: (to: string) => void }> = ({ navigate }) => {
+  const { user } = useAuth()
+  if (user) {
+    return <DashboardContent navigate={navigate} />
+  }
+  return <MarketingLanding navigate={navigate} />
 }
 
 export default App

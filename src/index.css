@@ -1,5 +1,26 @@
 @import "tailwindcss";
 
+/* Tokens de marca de la landing de marketing (src/features/marketing). */
+@theme static {
+  --color-ox-blue: #1d4ed8;
+  --color-ox-blue-700: #1e40af;
+  --color-ox-navy: #0b1a45;
+  --color-ox-navy-950: #060d26;
+  --color-ox-amber: #f5b83d;
+  --color-ox-amber-soft: #fff4dc;
+  --color-ox-ice: #e9f0ff;
+  --color-ox-ink: #0b1020;
+  --color-ox-ink-600: #45506a;
+  --color-ox-ink-500: #66708a;
+  --color-ox-paper: #f5f7fb;
+  --color-ox-line: #e2e6ef;
+
+  --font-ox-display: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-ox-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  --ease-ox: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 @layer base {
   :root {
     --color-primary: #1e3a8a;
