@@ -68,7 +68,7 @@ export const ExcelChampionshipImporter: React.FC<ExcelChampionshipImporterProps>
 
     try {
       const buffer = await selected.arrayBuffer()
-      const audit = parseExcelWorkbook(buffer)
+      const audit = await parseExcelWorkbook(buffer)
       setAuditResult(audit)
       setStage(3) // Avanzar automáticamente a Vista Previa
     } catch (err) {

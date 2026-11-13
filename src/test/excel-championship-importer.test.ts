@@ -25,8 +25,8 @@ describe('Operix Gymnastics — Control de Calidad del Importador Excel', () => 
     expect(excelBuffer.byteLength).toBeGreaterThan(10000)
   })
 
-  it('2. Debe parsear íntegramente las 8 hojas del libro Excel', () => {
-    const audit = parseExcelWorkbook(excelBuffer)
+  it('2. Debe parsear íntegramente las 8 hojas del libro Excel', async () => {
+    const audit = await parseExcelWorkbook(excelBuffer)
     expect(audit.sheetNames).toEqual([
       'Hoja1',
       'GAM',
@@ -39,16 +39,16 @@ describe('Operix Gymnastics — Control de Calidad del Importador Excel', () => 
     ])
   })
 
-  it('3. Debe verificar las cantidades exactas de gimnastas por hoja', () => {
-    const audit = parseExcelWorkbook(excelBuffer)
+  it('3. Debe verificar las cantidades exactas de gimnastas por hoja', async () => {
+    const audit = await parseExcelWorkbook(excelBuffer)
     expect(audit.counts.hoja1Athletes).toBe(158)
     expect(audit.counts.gamAthletes).toBe(16)
     expect(audit.counts.gafAthletes).toBe(137)
     expect(audit.counts.totalUniqueAthletes).toBe(153) // 16 GAM + 137 GAF
   })
 
-  it('4. Debe verificar que NO existen puntuaciones ficticias en las papeletas (Cero notas)', () => {
-    const audit = parseExcelWorkbook(excelBuffer)
+  it('4. Debe verificar que NO existen puntuaciones ficticias en las papeletas (Cero notas)', async () => {
+    const audit = await parseExcelWorkbook(excelBuffer)
     expect(audit.counts.existingScoresFound).toBe(0)
     const zeroScoreNotice = audit.inconsistencies.find(i => i.description.includes('0 puntuaciones'))
     expect(zeroScoreNotice).toBeDefined()
@@ -102,8 +102,8 @@ describe('Operix Gymnastics — Control de Calidad del Importador Excel', () => 
     expect(n3.lastName).toBe('Participante')
   })
 
-  it('8. Debe mapear aparatos reglamentarios según la rama (GAM vs GAF)', () => {
-    const audit = parseExcelWorkbook(excelBuffer)
+  it('8. Debe mapear aparatos reglamentarios según la rama (GAM vs GAF)', async () => {
+    const audit = await parseExcelWorkbook(excelBuffer)
     const gamBoy = audit.athletes.find(a => a.originalName.includes('Luke James'))
     expect(gamBoy).toBeDefined()
     expect(gamBoy?.discipline).toBe('GAM')
@@ -119,8 +119,8 @@ describe('Operix Gymnastics — Control de Calidad del Importador Excel', () => 
     expect(gafGirl?.apparatusCodes).toEqual(['VT', 'FX', 'BB', 'UB'])
   })
 
-  it('9. Debe identificar y conciliar inconsistencias cruzadas entre Hoja1 y GAM/GAF', () => {
-    const audit = parseExcelWorkbook(excelBuffer)
+  it('9. Debe identificar y conciliar inconsistencias cruzadas entre Hoja1 y GAM/GAF', async () => {
+    const audit = await parseExcelWorkbook(excelBuffer)
 
     // Inconsistencias de omisión
     const missingInDiscipline = audit.inconsistencies.filter(i => i.type === 'missing_in_discipline')
@@ -140,28 +140,28 @@ describe('Operix Gymnastics — Control de Calidad del Importador Excel', () => 
     expect(clubInc?.type).toBe('club_ambiguity')
   })
 
-  it('10. Debe extraer correctamente el cronograma (PROGRAMA) con 21 hitos', () => {
-    const audit = parseExcelWorkbook(excelBuffer)
+  it('10. Debe extraer correctamente el cronograma (PROGRAMA) con 21 hitos', async () => {
+    const audit = await parseExcelWorkbook(excelBuffer)
     expect(audit.schedule.length).toBeGreaterThanOrEqual(10)
     expect(audit.schedule[0].event).toBe('APERTURA GIMNASIO')
     expect(audit.schedule[0].time).toBe('08:00:00')
   })
 
-  it('11. Debe extraer las 80 categorías de premiación y 310 medallas totales de MEDALLAS', () => {
-    const audit = parseExcelWorkbook(excelBuffer)
+  it('11. Debe extraer las 80 categorías de premiación y 310 medallas totales de MEDALLAS', async () => {
+    const audit = await parseExcelWorkbook(excelBuffer)
     expect(audit.awards.length).toBe(80)
     expect(audit.counts.totalAwardsCount).toBe(310)
   })
 
-  it('12. Debe garantizar la protección y aislamiento de campeonatos anteriores', () => {
-    const audit = parseExcelWorkbook(excelBuffer)
+  it('12. Debe garantizar la protección y aislamiento de campeonatos anteriores', async () => {
+    const audit = await parseExcelWorkbook(excelBuffer)
     expect(audit.championshipName).toBe('Campeonato Artística 2026 - Paillaco')
     expect(audit.status).toBe('draft')
     expect(audit.branches).toEqual(['GAM', 'GAF'])
   })
 
-  it('13. Debe auditar la distribución exacta de fechas de nacimiento sin inventar fechas sintéticas', () => {
-    const audit = parseExcelWorkbook(excelBuffer)
+  it('13. Debe auditar la distribución exacta de fechas de nacimiento sin inventar fechas sintéticas', async () => {
+    const audit = await parseExcelWorkbook(excelBuffer)
     expect(audit.athletes.length).toBe(153)
 
     const withFullDate = audit.athletes.filter(a => a.birthDate !== null && a.birthDate !== '')

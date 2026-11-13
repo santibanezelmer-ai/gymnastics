@@ -1,11 +1,11 @@
 /**
- * OPERIX GYMNASTICS — MOTOR DE PARSEO Y AUDITORÍA DE EXCEL
+ * OPERIX GYMNASTICS — MOTOR DE PARSEO Y AUDITORÍA DE EXCEL (Migrado a ExcelJS)
  * Archivo: ARTISTICA CAMPEONATO 2026.xlsx
  * Desarrollado por Comercial Hels SpA
  * Fecha: 12 de noviembre de 2026
  */
 
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import type {
   ExcelAuditResult,
   RawAthleteRecord,
@@ -67,6 +67,15 @@ export function parseExcelDate(raw: unknown): {
     return { dateStr: null, birthYear: null, estimatedAge: null, isEstimated: false }
   }
 
+  // Si ya es un objeto Date
+  if (raw instanceof Date) {
+    const y = raw.getUTCFullYear()
+    const m = String(raw.getUTCMonth() + 1).padStart(2, '0')
+    const d = String(raw.getUTCDate()).padStart(2, '0')
+    const age = 2026 - y
+    return { dateStr: `${y}-${m}-${d}`, birthYear: y, estimatedAge: age, isEstimated: false }
+  }
+
   // 1. Número serial Excel o Año solo
   if (typeof raw === 'number' || (!isNaN(Number(raw)) && !String(raw).includes('/') && !String(raw).includes('-'))) {
     const num = Number(raw)
@@ -105,7 +114,17 @@ export function parseExcelDate(raw: unknown): {
     return { dateStr: `${y}-${m}-${d}`, birthYear: y, estimatedAge: age, isEstimated: false }
   }
 
-  // 4. Solo año como texto
+  // 4. Formato DD-MM-YYYY
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(s)) {
+    const parts = s.split('-')
+    const d = parts[0].padStart(2, '0')
+    const m = parts[1].padStart(2, '0')
+    const y = parseInt(parts[2], 10)
+    const age = 2026 - y
+    return { dateStr: `${y}-${m}-${d}`, birthYear: y, estimatedAge: age, isEstimated: false }
+  }
+
+  // 5. Solo año como texto
   if (/^\d{4}$/.test(s)) {
     const y = parseInt(s, 10)
     return { dateStr: null, birthYear: y, estimatedAge: 2026 - y, isEstimated: true }
@@ -133,107 +152,124 @@ export function splitFullName(fullName: string): { firstName: string; lastName: 
   }
 }
 
-export function parseExcelWorkbook(data: ArrayBuffer | Uint8Array): ExcelAuditResult {
-  const wb = XLSX.read(data, { type: 'array', cellDates: false, raw: true })
-  const sheetNames = wb.SheetNames
+function getCellValue(row: ExcelJS.Row | undefined, colIdx0: number): unknown {
+  if (!row) return ''
+  const cell = row.getCell(colIdx0 + 1)
+  if (!cell || cell.value === null || cell.value === undefined) return ''
+  if (typeof cell.value === 'object') {
+    if (cell.value instanceof Date) {
+      const y = cell.value.getUTCFullYear()
+      if (y === 1899 || y === 1900) {
+        // Pure time value (Excel stores standalone times on 1899-12-30)
+        const h = String(cell.value.getUTCHours()).padStart(2, '0')
+        const m = String(cell.value.getUTCMinutes()).padStart(2, '0')
+        const s = String(cell.value.getUTCSeconds()).padStart(2, '0')
+        return `${h}:${m}:${s}`
+      }
+      const m = String(cell.value.getUTCMonth() + 1).padStart(2, '0')
+      const d = String(cell.value.getUTCDate()).padStart(2, '0')
+      return `${y}-${m}-${d}`
+    }
+    const val = cell.value as unknown as Record<string, unknown>
+    if ('text' in val && val.text) return val.text
+    if ('result' in val && val.result !== undefined) return val.result
+    if ('richText' in val && Array.isArray(val.richText)) {
+      return val.richText.map((rt: { text?: string }) => rt.text || '').join('')
+    }
+  }
+  return cell.value
+}
+
+export async function parseExcelWorkbook(data: ArrayBuffer | Uint8Array): Promise<ExcelAuditResult> {
+  const wb = new ExcelJS.Workbook()
+  await wb.xlsx.load(data as ArrayBuffer)
+  const sheetNames = wb.worksheets.map((ws) => ws.name)
 
   // 1. Extraer Hoja1 (Nómina General)
   const hoja1Athletes: RawAthleteRecord[] = []
-  if (wb.Sheets['Hoja1']) {
-    const sheet = wb.Sheets['Hoja1']
-    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1')
-    for (let r = range.s.r; r <= range.e.r; r++) {
-      const getCell = (c: number) => {
-        const addr = XLSX.utils.encode_cell({ r, c })
-        return sheet[addr] ? sheet[addr].v : ''
-      }
-      const name = normalizeString(getCell(0))
+  const sheetHoja1 = wb.getWorksheet('Hoja1')
+  if (sheetHoja1) {
+    for (let r = 1; r <= sheetHoja1.rowCount; r++) {
+      const row = sheetHoja1.getRow(r)
+      const name = normalizeString(getCellValue(row, 0))
       if (!name || name.toUpperCase().includes('NOMBRE GIMNASTA')) continue
 
       hoja1Athletes.push({
         sheet: 'Hoja1',
-        row: r + 1,
-        nameRaw: String(getCell(0)),
+        row: r,
+        nameRaw: String(getCellValue(row, 0)),
         name,
-        levelRaw: String(getCell(1)),
-        level: normalizeString(getCell(1)),
-        franjaRaw: String(getCell(2)),
-        franja: normalizeString(getCell(2)),
-        clubRaw: String(getCell(3)),
-        club: normalizeString(getCell(3)),
-        salto: String(getCell(4)).trim().toUpperCase() === 'X',
-        suelo: String(getCell(5)).trim().toUpperCase() === 'X',
-        viga: String(getCell(6)).trim().toUpperCase() === 'X',
-        barra: String(getCell(7)).trim().toUpperCase() === 'X',
-        paralela: String(getCell(8)).trim().toUpperCase() === 'X',
+        levelRaw: String(getCellValue(row, 1)),
+        level: normalizeString(getCellValue(row, 1)),
+        franjaRaw: String(getCellValue(row, 2)),
+        franja: normalizeString(getCellValue(row, 2)),
+        clubRaw: String(getCellValue(row, 3)),
+        club: normalizeString(getCellValue(row, 3)),
+        salto: String(getCellValue(row, 4)).trim().toUpperCase() === 'X',
+        suelo: String(getCellValue(row, 5)).trim().toUpperCase() === 'X',
+        viga: String(getCellValue(row, 6)).trim().toUpperCase() === 'X',
+        barra: String(getCellValue(row, 7)).trim().toUpperCase() === 'X',
+        paralela: String(getCellValue(row, 8)).trim().toUpperCase() === 'X',
       })
     }
   }
 
   // 2. Extraer GAM (Varones)
   const gamAthletes: RawAthleteRecord[] = []
-  if (wb.Sheets['GAM']) {
-    const sheet = wb.Sheets['GAM']
-    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1')
-    for (let r = range.s.r; r <= range.e.r; r++) {
-      const getCell = (c: number) => {
-        const addr = XLSX.utils.encode_cell({ r, c })
-        return sheet[addr] ? sheet[addr].v : ''
-      }
-      const name = normalizeString(getCell(0))
+  const sheetGam = wb.getWorksheet('GAM')
+  if (sheetGam) {
+    for (let r = 1; r <= sheetGam.rowCount; r++) {
+      const row = sheetGam.getRow(r)
+      const name = normalizeString(getCellValue(row, 0))
       if (!name || name.toUpperCase().includes('NOMBRE GIMNASTA')) continue
 
       gamAthletes.push({
         sheet: 'GAM',
-        row: r + 1,
-        nameRaw: String(getCell(0)),
+        row: r,
+        nameRaw: String(getCellValue(row, 0)),
         name,
-        levelRaw: String(getCell(1)),
-        level: normalizeString(getCell(1)),
-        franjaRaw: String(getCell(2)),
-        franja: normalizeString(getCell(2)),
-        clubRaw: String(getCell(3)),
-        club: normalizeString(getCell(3)),
-        salto: String(getCell(4)).trim().toUpperCase() === 'X',
-        suelo: String(getCell(5)).trim().toUpperCase() === 'X',
-        viga: String(getCell(6)).trim().toUpperCase() === 'X',
-        barra: String(getCell(7)).trim().toUpperCase() === 'X',
-        paralela: String(getCell(8)).trim().toUpperCase() === 'X',
+        levelRaw: String(getCellValue(row, 1)),
+        level: normalizeString(getCellValue(row, 1)),
+        franjaRaw: String(getCellValue(row, 2)),
+        franja: normalizeString(getCellValue(row, 2)),
+        clubRaw: String(getCellValue(row, 3)),
+        club: normalizeString(getCellValue(row, 3)),
+        salto: String(getCellValue(row, 4)).trim().toUpperCase() === 'X',
+        suelo: String(getCellValue(row, 5)).trim().toUpperCase() === 'X',
+        viga: String(getCellValue(row, 6)).trim().toUpperCase() === 'X',
+        barra: String(getCellValue(row, 7)).trim().toUpperCase() === 'X',
+        paralela: String(getCellValue(row, 8)).trim().toUpperCase() === 'X',
       })
     }
   }
 
   // 3. Extraer GAF (Damas)
   const gafAthletes: RawAthleteRecord[] = []
-  if (wb.Sheets['GAF']) {
-    const sheet = wb.Sheets['GAF']
-    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1')
-    for (let r = range.s.r; r <= range.e.r; r++) {
-      const getCell = (c: number) => {
-        const addr = XLSX.utils.encode_cell({ r, c })
-        return sheet[addr] ? sheet[addr].v : ''
-      }
-      const name = normalizeString(getCell(0))
+  const sheetGaf = wb.getWorksheet('GAF')
+  if (sheetGaf) {
+    for (let r = 1; r <= sheetGaf.rowCount; r++) {
+      const row = sheetGaf.getRow(r)
+      const name = normalizeString(getCellValue(row, 0))
       if (!name || name.toUpperCase().includes('NOMBRE GIMNASTA')) continue
 
-      const rawDate = getCell(8)
-      const rawAge = getCell(9)
+      const rawDate = getCellValue(row, 8)
+      const rawAge = getCellValue(row, 9)
 
       gafAthletes.push({
         sheet: 'GAF',
-        row: r + 1,
-        nameRaw: String(getCell(0)),
+        row: r,
+        nameRaw: String(getCellValue(row, 0)),
         name,
-        levelRaw: String(getCell(1)),
-        level: normalizeString(getCell(1)),
-        franjaRaw: String(getCell(2)),
-        franja: normalizeString(getCell(2)),
-        clubRaw: String(getCell(3)),
-        club: normalizeString(getCell(3)),
-        salto: String(getCell(4)).trim().toUpperCase() === 'X',
-        suelo: String(getCell(5)).trim().toUpperCase() === 'X',
-        viga: String(getCell(6)).trim().toUpperCase() === 'X',
-        barra: String(getCell(7)).trim().toUpperCase() === 'X',
+        levelRaw: String(getCellValue(row, 1)),
+        level: normalizeString(getCellValue(row, 1)),
+        franjaRaw: String(getCellValue(row, 2)),
+        franja: normalizeString(getCellValue(row, 2)),
+        clubRaw: String(getCellValue(row, 3)),
+        club: normalizeString(getCellValue(row, 3)),
+        salto: String(getCellValue(row, 4)).trim().toUpperCase() === 'X',
+        suelo: String(getCellValue(row, 5)).trim().toUpperCase() === 'X',
+        viga: String(getCellValue(row, 6)).trim().toUpperCase() === 'X',
+        barra: String(getCellValue(row, 7)).trim().toUpperCase() === 'X',
         paralela: false,
         birthDateRaw: String(rawDate || ''),
         age: !isNaN(Number(rawAge)) && rawAge !== '' ? Number(rawAge) : null,
@@ -244,18 +280,14 @@ export function parseExcelWorkbook(data: ArrayBuffer | Uint8Array): ExcelAuditRe
   // 4. Extraer PAPELETA VARONES y verificar puntuaciones
   let papeletaVaronesCount = 0
   let scoresFoundCount = 0
-  if (wb.Sheets['PAPELETA VARONES']) {
-    const sheet = wb.Sheets['PAPELETA VARONES']
-    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1')
-    for (let r = range.s.r; r <= range.e.r; r++) {
-      const getCell = (c: number) => {
-        const addr = XLSX.utils.encode_cell({ r, c })
-        return sheet[addr] ? sheet[addr].v : ''
-      }
-      const name = normalizeString(getCell(1))
+  const sheetPapeletaVarones = wb.getWorksheet('PAPELETA VARONES')
+  if (sheetPapeletaVarones) {
+    for (let r = 1; r <= sheetPapeletaVarones.rowCount; r++) {
+      const row = sheetPapeletaVarones.getRow(r)
+      const name = normalizeString(getCellValue(row, 1))
       if (name && name !== 'NOMBRE GIMNASTA' && name !== 'APARATO') {
         papeletaVaronesCount++
-        const finalScore = normalizeString(getCell(6))
+        const finalScore = normalizeString(getCellValue(row, 6))
         if (finalScore && !isNaN(Number(finalScore))) scoresFoundCount++
       }
     }
@@ -263,24 +295,20 @@ export function parseExcelWorkbook(data: ArrayBuffer | Uint8Array): ExcelAuditRe
 
   // 5. Extraer PAPELETA GAF y verificar puntuaciones
   let papeletaGafCount = 0
-  if (wb.Sheets['PAPELETA GAF']) {
-    const sheet = wb.Sheets['PAPELETA GAF']
-    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1')
-    for (let r = range.s.r; r <= range.e.r; r++) {
-      const getCell = (c: number) => {
-        const addr = XLSX.utils.encode_cell({ r, c })
-        return sheet[addr] ? sheet[addr].v : ''
-      }
-      const name = normalizeString(getCell(1))
+  const sheetPapeletaGaf = wb.getWorksheet('PAPELETA GAF')
+  if (sheetPapeletaGaf) {
+    for (let r = 1; r <= sheetPapeletaGaf.rowCount; r++) {
+      const row = sheetPapeletaGaf.getRow(r)
+      const name = normalizeString(getCellValue(row, 1))
       if (name && name !== 'NOMBRE GIMNASTA' && name !== 'CLUB' && name !== 'APARATO') {
         papeletaGafCount++
-        const finalScore = normalizeString(getCell(6))
+        const finalScore = normalizeString(getCellValue(row, 6))
         if (finalScore && !isNaN(Number(finalScore))) scoresFoundCount++
       }
-      const sideName = normalizeString(getCell(12))
+      const sideName = normalizeString(getCellValue(row, 12))
       if (sideName && sideName !== 'NOMBRE GIMNASTA') {
         papeletaGafCount++
-        const sideFinal = normalizeString(getCell(16))
+        const sideFinal = normalizeString(getCellValue(row, 16))
         if (sideFinal && !isNaN(Number(sideFinal))) scoresFoundCount++
       }
     }
@@ -288,18 +316,19 @@ export function parseExcelWorkbook(data: ArrayBuffer | Uint8Array): ExcelAuditRe
 
   // 6. Extraer PROGRAMA
   const scheduleEvents: ScheduleEventItem[] = []
-  if (wb.Sheets['PROGRAMA']) {
-    const sheet = wb.Sheets['PROGRAMA']
-    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1')
-    for (let r = range.s.r; r <= range.e.r; r++) {
-      const getCell = (c: number) => {
-        const addr = XLSX.utils.encode_cell({ r, c })
-        return sheet[addr] ? sheet[addr].v : ''
-      }
-      const tRaw = getCell(0)
-      const evt = normalizeString(getCell(1))
+  const sheetPrograma = wb.getWorksheet('PROGRAMA')
+  if (sheetPrograma) {
+    for (let r = 1; r <= sheetPrograma.rowCount; r++) {
+      const row = sheetPrograma.getRow(r)
+      const tRaw = getCellValue(row, 0)
+      const evt = normalizeString(getCellValue(row, 1))
       let timeFmt = normalizeString(tRaw)
-      if (typeof tRaw === 'number') {
+      if (tRaw instanceof Date) {
+        const h = String(tRaw.getUTCHours()).padStart(2, '0')
+        const m = String(tRaw.getUTCMinutes()).padStart(2, '0')
+        const s = String(tRaw.getUTCSeconds()).padStart(2, '0')
+        timeFmt = `${h}:${m}:${s}`
+      } else if (typeof tRaw === 'number') {
         const sec = Math.round(tRaw * 86400)
         const h = Math.floor(sec / 3600)
         const m = Math.floor((sec % 3600) / 60)
@@ -307,31 +336,27 @@ export function parseExcelWorkbook(data: ArrayBuffer | Uint8Array): ExcelAuditRe
         timeFmt = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
       }
       if (evt && !evt.toUpperCase().includes('PROGRAMA DOMINGO')) {
-        scheduleEvents.push({ row: r + 1, time: timeFmt, event: evt })
+        scheduleEvents.push({ row: r, time: timeFmt, event: evt })
       }
     }
   }
 
   // 7. Extraer MEDALLAS
   const awardRules: AwardRuleItem[] = []
-  if (wb.Sheets['MEDALLAS']) {
-    const sheet = wb.Sheets['MEDALLAS']
-    const range = XLSX.utils.decode_range(sheet['!ref'] || 'A1:A1')
-    for (let r = range.s.r; r <= range.e.r; r++) {
-      const getCell = (c: number) => {
-        const addr = XLSX.utils.encode_cell({ r, c })
-        return sheet[addr] ? sheet[addr].v : ''
-      }
-      const catRule = normalizeString(getCell(0))
+  const sheetMedallas = wb.getWorksheet('MEDALLAS')
+  if (sheetMedallas) {
+    for (let r = 1; r <= sheetMedallas.rowCount; r++) {
+      const row = sheetMedallas.getRow(r)
+      const catRule = normalizeString(getCellValue(row, 0))
       if (!catRule || catRule.toUpperCase().includes('CATEGORÍA')) continue
       const places: number[] = []
       for (let c = 1; c <= 8; c++) {
-        if (String(getCell(c)).trim().toUpperCase() === 'X') places.push(c)
+        if (String(getCellValue(row, c)).trim().toUpperCase() === 'X') places.push(c)
       }
-      const tot = normalizeString(getCell(9))
+      const tot = normalizeString(getCellValue(row, 9))
       const totalCount = !isNaN(Number(tot)) ? Number(tot) : places.length
       awardRules.push({
-        row: r + 1,
+        row: r,
         categoryRule: catRule,
         placesAwarded: places,
         totalAwards: totalCount,
@@ -348,33 +373,45 @@ export function parseExcelWorkbook(data: ArrayBuffer | Uint8Array): ExcelAuditRe
     inconsistencies.push({
       type: 'apparatus_special',
       severity: 'info',
-      athleteName: 'Todas las papeletas',
-      club: 'General',
-      description: 'Papeletas de jueces en blanco (0 puntuaciones registradas en el archivo fuente).',
-      proposedResolution: 'Importar estructura de competición limpia en estado Borrador sin notas ficticias.',
+      athleteName: 'Torneo Paillaco 2026',
+      club: 'Todas las delegaciones',
+      description: 'Se detectaron 0 puntuaciones preexistentes en las papeletas. Campeonato limpio para inicio en vivo.',
+      proposedResolution: 'Listo para ingreso oficial de notas en vivo por jueces autorizados.',
+    })
+  } else {
+    inconsistencies.push({
+      type: 'apparatus_special',
+      severity: 'warning',
+      athleteName: 'Torneo Paillaco 2026',
+      club: 'Planilla Original',
+      description: `Se detectaron ${scoresFoundCount} notas históricas en las papeletas del Excel.`,
+      proposedResolution: 'Revisar si corresponden a ensayos previos.',
     })
   }
 
-  // Mapeos conocidos de nombres
+  // Diccionario de correspondencias ortográficas conocidas
   const knownSpellingMatches: Record<string, string> = {
-    'amanda bastidas': 'AMANDA BASTÍAS',
-    'lucia marin': 'LUCIA MARTIN',
-    agustin: 'Agustín Urbina',
+    [normalizeKey('Amanda  Castillo')]: normalizeKey('Amanda Castillo Perez'),
+    [normalizeKey('Isidora Cares')]: normalizeKey('Isidora Cares Perez'),
+    [normalizeKey('Josefa Leal')]: normalizeKey('Josefa Leal San Martin'),
+    [normalizeKey('Florencia Henriquez')]: normalizeKey('Florencia Henriquez M.'),
+    [normalizeKey('Maite  Hernandez')]: normalizeKey('Maite Hernandez'),
+    [normalizeKey('Florencia  Vargas')]: normalizeKey('Florencia Vargas'),
+    [normalizeKey('Renata  Cardenas')]: normalizeKey('Renata Cardenas'),
+    [normalizeKey('Constanza  Bustamante')]: normalizeKey('Constanza Bustamante'),
+    [normalizeKey('Josefa  Leal')]: normalizeKey('Josefa Leal San Martin'),
   }
 
   const h1Map = new Map<string, RawAthleteRecord>()
-  hoja1Athletes.forEach(g => h1Map.set(normalizeKey(g.name), g))
+  for (const h of hoja1Athletes) {
+    h1Map.set(normalizeKey(h.name), h)
+  }
 
-  // Procesar GAM (16 gimnastas)
+  // Reconciliación GAM (16 Atletas)
   for (const g of gamAthletes) {
     const k = normalizeKey(g.name)
-    const { canonicalName, code } = getCanonicalClub(g.club)
-    const apps: string[] = []
-    if (g.suelo) apps.push('FX')
-    if (g.salto) apps.push('VT')
-    if (g.paralela) apps.push('PB')
-    if (apps.length === 0) apps.push('FX', 'VT')
-
+    const h1 = h1Map.get(k) || (knownSpellingMatches[k] ? h1Map.get(knownSpellingMatches[k]) : undefined)
+    const { canonicalName, code } = getCanonicalClub(g.club || h1?.club || '')
     let normName = g.name
     if (k === 'agustin') {
       normName = 'Agustín Urbina'
@@ -388,24 +425,40 @@ export function parseExcelWorkbook(data: ArrayBuffer | Uint8Array): ExcelAuditRe
       })
     }
 
-    let athleteClub = canonicalName
-    let athleteClubCode = code
+    const { firstName, lastName } = splitFullName(normName)
 
-    if (k === 'thomas martinez') {
-      athleteClub = 'Club Pendiente de Validación'
-      athleteClubCode = 'PEND'
+    const apps: string[] = []
+    if (g.suelo) apps.push('FX')
+    if (g.salto) apps.push('VT')
+    if (g.paralela) apps.push('PB')
+    if (apps.length === 0) apps.push('FX', 'VT', 'PB') // Default FIG GAM activo
+
+    const athleteIncs: string[] = []
+    if (!h1) {
+      athleteIncs.push('No figura en nómina general (Hoja1).')
+    }
+    if (g.viga || g.barra) {
+      athleteIncs.push('Figura con marcas en aparatos exclusivos de GAF.')
       inconsistencies.push({
-        type: 'club_ambiguity',
+        type: 'apparatus_special',
         severity: 'warning',
-        athleteName: 'THOMAS MARTINEZ',
-        club: 'Pendiente de Validación',
-        description: `Club ambiguo en disputa: Hoja1 indica "USS", GAM indica "ULA", y Resumen/Papeletas lo agrupa con "ACRODAN".`,
-        proposedResolution: 'Mantener afiliación como Pendiente de Validación (USS/ULA/Acrodan) sin asignar ULA como definitivo hasta confirmación oficial.',
+        athleteName: g.name,
+        club: canonicalName,
+        description: `Gimnasta masculino marcado con aparatos femeninos (Viga/Asimétricas). Corregido a aparatos oficiales GAM (FX, VT, PB).`,
+        proposedResolution: 'Asignar exclusivamente aparatos oficiales GAM según planilla de rotaciones.',
       })
     }
 
-    const { firstName, lastName } = splitFullName(normName)
-    const dateParsed = parseExcelDate(null)
+    if (normalizeKey(g.name).includes('thomas martinez')) {
+      inconsistencies.push({
+        type: 'club_ambiguity',
+        severity: 'warning',
+        athleteName: g.name,
+        club: `${canonicalName} / Club Gimnástico Paillaco`,
+        description: `Figura con club Olimpo en Hoja1 pero en Club Gimnástico Paillaco en la planilla GAM. Asignado a ${canonicalName} manteniendo consistencia federada.`,
+        proposedResolution: 'Confirmar club final en mesa de acreditación.',
+      })
+    }
 
     reconciledAthletes.push({
       sourceSheet: 'GAM',
@@ -419,35 +472,69 @@ export function parseExcelWorkbook(data: ArrayBuffer | Uint8Array): ExcelAuditRe
       rawFranja: g.franjaRaw,
       normalizedFranja: g.franja || '1',
       rawClub: g.clubRaw,
-      canonicalClub: athleteClub,
-      clubCode: athleteClubCode,
-      birthDate: dateParsed.dateStr,
-      birthYear: dateParsed.birthYear,
-      age: dateParsed.estimatedAge,
+      canonicalClub: canonicalName,
+      clubCode: code,
+      birthDate: null,
+      birthYear: null,
+      age: null,
       isAgeEstimated: false,
       apparatusCodes: apps,
-      inconsistencies: [],
+      inconsistencies: athleteIncs,
     })
   }
 
-  // Procesar GAF (137 gimnastas)
+  // Reconciliación GAF (137 Atletas)
   for (const g of gafAthletes) {
-    const { canonicalName, code } = getCanonicalClub(g.club)
+    const k = normalizeKey(g.name)
+    const h1 = h1Map.get(k) || (knownSpellingMatches[k] ? h1Map.get(knownSpellingMatches[k]) : undefined)
+    const { canonicalName, code } = getCanonicalClub(g.club || h1?.club || '')
+    let normName = g.name
+    if (k === 'agustin') {
+      normName = 'Agustín Urbina'
+      inconsistencies.push({
+        type: 'spelling_variation',
+        severity: 'info',
+        athleteName: 'Agustin',
+        club: canonicalName,
+        description: 'Nombre incompleto "Agustin" en GAM, expandido a "Agustín Urbina" según Papeleta Varones.',
+        proposedResolution: 'Conservar como "Agustín Urbina" para identificación deportiva.',
+      })
+    }
+
+    const { firstName, lastName } = splitFullName(normName)
+    const dateParsed = parseExcelDate(g.birthDateRaw)
+
     const apps: string[] = []
     if (g.salto) apps.push('VT')
     if (g.suelo) apps.push('FX')
     if (g.viga) apps.push('BB')
     if (g.barra) apps.push('UB')
-    if (apps.length === 0) apps.push('VT', 'UB', 'BB', 'FX')
-
-    const dateParsed = parseExcelDate(g.birthDateRaw)
-    const ageFinal = g.age !== null && g.age !== undefined ? g.age : dateParsed.estimatedAge
-    const { firstName, lastName } = splitFullName(g.name)
+    if (apps.length === 0) apps.push('VT', 'FX', 'BB', 'UB') // All-Around GAF estándar
 
     const athleteIncs: string[] = []
-    if (dateParsed.birthYear && !dateParsed.dateStr) {
-      athleteIncs.push(`Solo se indicó año de nacimiento (${dateParsed.birthYear}); no se genera fecha sintética.`)
-    } else if (!dateParsed.dateStr && ageFinal === null) {
+    if (!h1) {
+      athleteIncs.push('No figura en nómina general (Hoja1).')
+    }
+
+    let ageFinal = dateParsed.estimatedAge || g.age || null
+    if (dateParsed.isEstimated) {
+      inconsistencies.push({
+        type: 'age_missing',
+        severity: 'info',
+        athleteName: g.name,
+        club: canonicalName,
+        description: `Gimnasta con solo año de nacimiento (${dateParsed.birthYear}). Edad estimada en ${ageFinal} años al 2026 sin inventar fecha exacta.`,
+        proposedResolution: 'Almacenar año de nacimiento y mantener birth_date como NULL según diseño auditado.',
+      })
+    } else if (!dateParsed.dateStr && !dateParsed.birthYear) {
+      inconsistencies.push({
+        type: 'age_missing',
+        severity: 'warning',
+        athleteName: g.name,
+        club: canonicalName,
+        description: 'Sin fecha de nacimiento ni año disponible en la planilla.',
+        proposedResolution: 'Solicitar acreditación de carnet o certificado de nacimiento en acreditaciones.',
+      })
       athleteIncs.push('Sin fecha ni año de nacimiento en la planilla oficial.')
     }
 

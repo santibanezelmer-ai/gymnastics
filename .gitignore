@@ -22,3 +22,21 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment & Secrets
+.env
+.env*.local
+*.pem
+*.key
+
+# Sensitive Competition & Personal Data (Ley 19.628 / GDPR / Minor Protection)
+data/*.xlsx
+data/*.xls
+data/*.csv
+data/*_results.json
+data/*_audit*.json
+supabase/import_*_master.sql
+supabase/import_*.sql
+supabase/cleanup_*.sql
+scripts/*_audit_*.py
+scripts/*_master_*.py
