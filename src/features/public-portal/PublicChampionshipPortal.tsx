@@ -43,6 +43,7 @@ export interface PublicChampionshipPortalProps {
   slug?: string
   onNavigateToDelegates?: () => void
   onNavigateHome?: () => void
+  onNavigateToEvents?: () => void
 }
 
 interface ParticipatingClub {
@@ -83,6 +84,7 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
   slug = 'artistica-paillaco-2026',
   onNavigateToDelegates,
   onNavigateHome,
+  onNavigateToEvents,
 }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'athletes' | 'clubs' | 'results' | 'podiums'>('info')
   const [isLoading, setIsLoading] = useState(true)
@@ -318,7 +320,16 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
       <nav className="sticky top-0 z-50 border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">
           <div className="flex items-center gap-3">
-            {onNavigateHome && (
+            {onNavigateToEvents ? (
+              <button
+                type="button"
+                onClick={onNavigateToEvents}
+                className="flex items-center gap-1.5 rounded-xl border border-slate-800 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+              >
+                <ArrowLeft className="h-3.5 w-3.5" />
+                <span>Ver Todos los Eventos</span>
+              </button>
+            ) : onNavigateHome ? (
               <button
                 type="button"
                 onClick={onNavigateHome}
@@ -327,7 +338,7 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
                 <ArrowLeft className="h-3.5 w-3.5" />
                 <span>Inicio Operix</span>
               </button>
-            )}
+            ) : null}
             <div className="flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 text-white shadow-sm">
                 <Trophy className="h-4 w-4" />

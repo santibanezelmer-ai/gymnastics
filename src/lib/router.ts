@@ -18,12 +18,20 @@ export interface RouteState {
 function parsePath(pathname: string): RouteState {
   const cleanPath = pathname.replace(/\/$/, '') || '/'
 
-  // 1. Match /evento/:slug
+  // 1. Match /evento/:slug (con slug especificado)
   const eventMatch = cleanPath.match(/^\/evento\/([^/]+)/)
-  if (eventMatch) {
+  if (eventMatch && eventMatch[1].trim()) {
     return {
       path: '/evento',
       params: { slug: decodeURIComponent(eventMatch[1]) },
+    }
+  }
+
+  // 1.1 Match /eventos o /evento (sin slug) -> Cartelera pública de eventos
+  if (cleanPath === '/eventos' || cleanPath === '/evento') {
+    return {
+      path: '/eventos',
+      params: {},
     }
   }
 

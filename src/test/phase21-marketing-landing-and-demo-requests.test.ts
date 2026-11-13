@@ -150,4 +150,27 @@ describe('FASE 21: Marketing Landing, Rutas y Solicitudes de Demo', () => {
       expect(sql).toContain('Comercial Hels SpA')
     })
   })
+
+  describe('4. Cartelera Pública de Eventos y Ruteo (/evento y /eventos)', () => {
+    it('el archivo del router debe resolver correctamente /eventos y /evento hacia la cartelera pública', () => {
+      const routerFilePath = path.resolve(__dirname, '../lib/router.ts')
+      const routerCode = fs.readFileSync(routerFilePath, 'utf-8')
+
+      expect(routerCode).toContain("cleanPath === '/eventos' || cleanPath === '/evento'")
+      expect(routerCode).toContain("path: '/eventos'")
+    })
+
+    it('el componente PublicEventsDirectory debe existir y exportar la cartelera', () => {
+      const directoryFilePath = path.resolve(
+        __dirname,
+        '../features/public-portal/PublicEventsDirectory.tsx'
+      )
+      expect(fs.existsSync(directoryFilePath)).toBe(true)
+
+      const directoryCode = fs.readFileSync(directoryFilePath, 'utf-8')
+      expect(directoryCode).toContain('PublicEventsDirectory')
+      expect(directoryCode).toContain('Cartelera Oficial de Campeonatos')
+      expect(directoryCode).toContain('artistica-paillaco-2026')
+    })
+  })
 })

@@ -15,6 +15,7 @@ import { AwardsManager } from '@/features/awards/AwardsManager'
 import { LandingPage, type LandingPageProps } from '@/features/landing/LandingPage'
 import { MarketingLanding } from '@/features/marketing/MarketingLanding'
 import { PublicChampionshipPortal } from '@/features/public-portal/PublicChampionshipPortal'
+import { PublicEventsDirectory } from '@/features/public-portal/PublicEventsDirectory'
 import { PublicAthletesRoster } from '@/features/public-portal/PublicAthletesRoster'
 import { ClubDelegatesPortal } from '@/features/delegates/ClubDelegatesPortal'
 import { AdminDashboardOverview } from '@/features/dashboard/AdminDashboardOverview'
@@ -521,7 +522,21 @@ const DashboardContent: React.FC<DashboardContentProps> = ({ navigate, initialTa
 export const App: React.FC = () => {
   const { route, navigate } = useRouter()
 
-  // 1. RUTA PÚBLICA: /evento/:slug (Portal Público del Campeonato)
+  // 1. RUTA CARTELERA PÚBLICA DE EVENTOS: /eventos o /evento sin slug
+  if (route.path === '/eventos') {
+    return (
+      <AuthProvider>
+        <OrganizationProvider>
+          <PublicEventsDirectory
+            navigate={navigate}
+            onSelectEvent={(slug) => navigate(`/evento/${slug}`)}
+          />
+        </OrganizationProvider>
+      </AuthProvider>
+    )
+  }
+
+  // 2. RUTA PÚBLICA: /evento/:slug (Portal Público del Campeonato)
   if (route.path === '/evento') {
     return (
       <AuthProvider>
@@ -530,6 +545,7 @@ export const App: React.FC = () => {
             slug={route.params.slug || 'artistica-paillaco-2026'}
             onNavigateToDelegates={() => navigate('/club/rotaciones')}
             onNavigateHome={() => navigate('/')}
+            onNavigateToEvents={() => navigate('/eventos')}
           />
         </OrganizationProvider>
       </AuthProvider>
