@@ -31,8 +31,10 @@ import {
   ExternalLink,
   Users,
   FileSpreadsheet,
+  Sliders,
 } from 'lucide-react'
 import { ExcelChampionshipImporter } from './importer/ExcelChampionshipImporter'
+import { ChampionshipRulesConfigModal } from './ChampionshipRulesConfigModal'
 
 export const ChampionshipsManager: React.FC = () => {
   const { activeOrganization, activeRole } = useOrganization()
@@ -40,6 +42,7 @@ export const ChampionshipsManager: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true)
   const [isCreating, setIsCreating] = useState(false)
   const [isImportingExcel, setIsImportingExcel] = useState(false)
+  const [rulesModalChamp, setRulesModalChamp] = useState<Championship | null>(null)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   // Form fields for Championship
@@ -711,14 +714,25 @@ export const ChampionshipsManager: React.FC = () => {
                       </button>
                     )}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleOpenCategories(champ)}
-                    className="font-semibold text-blue-700 hover:text-blue-800 hover:underline flex items-center gap-1"
-                  >
-                    <Layers className="h-3.5 w-3.5" />
-                    Categorías & Jurado →
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setRulesModalChamp(champ)}
+                      className="font-semibold text-indigo-700 hover:text-indigo-800 hover:underline flex items-center gap-1"
+                      title="Configuración de aparatos habilitados, All-Around, Top N equipos y desempates"
+                    >
+                      <Sliders className="h-3.5 w-3.5" />
+                      Reglamento & Top N
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenCategories(champ)}
+                      className="font-semibold text-blue-700 hover:text-blue-800 hover:underline flex items-center gap-1"
+                    >
+                      <Layers className="h-3.5 w-3.5" />
+                      Categorías & Jurado →
+                    </button>
+                  </div>
                 </div>
               </Card>
             )
@@ -1153,6 +1167,14 @@ export const ChampionshipsManager: React.FC = () => {
             </div>
           )}
         </Card>
+      )}
+
+      {/* MODAL DE CONFIGURACIÓN REGLAMENTARIA FLEXIBLE (FASE 18) */}
+      {rulesModalChamp && (
+        <ChampionshipRulesConfigModal
+          championship={rulesModalChamp}
+          onClose={() => setRulesModalChamp(null)}
+        />
       )}
     </div>
   )
