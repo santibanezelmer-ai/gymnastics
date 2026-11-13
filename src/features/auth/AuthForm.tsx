@@ -85,6 +85,7 @@ export const AuthForm: React.FC = () => {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Ej. María González"
+              style={{ color: '#0f172a', backgroundColor: '#ffffff' }}
               className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-100 shadow-2xs transition-all"
             />
           </div>
@@ -98,6 +99,7 @@ export const AuthForm: React.FC = () => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             placeholder="usuario@dominio.com"
+            style={{ color: '#0f172a', backgroundColor: '#ffffff' }}
             className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-100 shadow-2xs transition-all"
           />
         </div>
@@ -111,6 +113,7 @@ export const AuthForm: React.FC = () => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="••••••••"
+            style={{ color: '#0f172a', backgroundColor: '#ffffff' }}
             className="w-full rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-100 shadow-2xs transition-all"
           />
         </div>
