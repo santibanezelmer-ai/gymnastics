@@ -93,10 +93,17 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
   const [selectedBranch, setSelectedBranch] = useState<ModalityCode>('GAF')
   const [gafScheduleSteps, setGafScheduleSteps] = useState<ApparatusStep[]>([])
   const [gamScheduleSteps, setGamScheduleSteps] = useState<ApparatusStep[]>([])
-  const [lastUpdated, setLastUpdated] = useState<string>('05/11/2026, 12:30 hrs')
+  const [lastUpdated, setLastUpdated] = useState<string>('15/11/2026, 08:00 hrs')
   const notices = [
-    'Aviso Técnico: El calentamiento general de la Subdivisión 1 iniciará puntualmente a las 08:30 hrs.',
-    'Pista de Calentamiento: Cada gimnasta dispone de 30 segundos en Salto y 50 segundos en Barras Asimétricas.',
+    '08:00 - 08:15 hrs: Apertura Gimnasio Municipal y acreditación de delegaciones.',
+    '08:15 - 09:00 hrs: Calentamiento General y Prueba de Aparatos (Grupo A Femenina).',
+    '09:00 - 09:30 hrs: Desfile Oficial de Delegaciones, Himno Nacional y Juramento Gimnasta (Presencia obligatoria de todos los clubes).',
+    '09:30 - 11:15 hrs: Competición Grupo A Femenina (GAF) en 4 cuadrantes olímpicos.',
+    '12:00 - 13:00 hrs: Competición Oficial Rama Masculina (GAM) — Suelo (FX) y Salto (VT).',
+    '13:00 - 14:00 hrs: Ceremonia de Premiación Grupo A Femenina y Rama Masculina GAM.',
+    '14:00 - 15:00 hrs: Calentamiento General y Prueba de Aparatos (Grupo B Femenina).',
+    '15:00 - 16:45 hrs: Competición Grupo B Femenina (GAF) en 4 cuadrantes olímpicos.',
+    '17:30 - 18:30 hrs: Ceremonia de Premiación Grupo B Femenina y Gran Copa por Equipos.',
   ]
 
   // 1. Cargar lista de campeonatos disponibles
@@ -330,18 +337,64 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
           setSelectedBranch('GAF')
         }
 
-        // Hoja de ruta GAF (4 aparatos oficiales: VT -> UB -> BB -> FX)
-        const gafApps = [
-          { code: 'VT', name: 'Salto de Caballo', time: '09:30 - 10:15' },
-          { code: 'UB', name: 'Barras Asimétricas', time: '10:15 - 11:00' },
-          { code: 'BB', name: 'Viga de Equilibrio', time: '11:00 - 11:45' },
-          { code: 'FX', name: 'Suelo (Manos Libres)', time: '11:45 - 12:30' },
+        // Obtener el nombre del club actual para determinar su cuadrante oficial
+        const currentClub = userClubs.find((c) => c.id === clubId)
+        const activeClubName = currentClub?.name || clubName || ''
+        const normClub = activeClubName.toLowerCase()
+
+        // Secuencia oficial de 4 aparatos GAF según el cuadrante del club
+        let gafAppSequence = [
+          { code: 'VT', name: 'Salto de Caballo' },
+          { code: 'UB', name: 'Barras Asimétricas' },
+          { code: 'BB', name: 'Viga de Equilibrio' },
+          { code: 'FX', name: 'Suelo (Manos Libres)' },
         ]
-        const computedGafSteps: ApparatusStep[] = gafApps.map((app, rotIdx) => ({
+
+        if (normClub.includes('big bang') || normClub.includes('paillaco')) {
+          // Cuadrante Suelo (FX -> VT -> BB -> UB)
+          gafAppSequence = [
+            { code: 'FX', name: 'Suelo (Manos Libres)' },
+            { code: 'VT', name: 'Salto de Caballo' },
+            { code: 'BB', name: 'Viga de Equilibrio' },
+            { code: 'UB', name: 'Barras Asimétricas' },
+          ]
+        } else if (normClub.includes('acrodan') || normClub.includes('ainilebu')) {
+          // Cuadrante Salto (VT -> BB -> UB -> FX)
+          gafAppSequence = [
+            { code: 'VT', name: 'Salto de Caballo' },
+            { code: 'BB', name: 'Viga de Equilibrio' },
+            { code: 'UB', name: 'Barras Asimétricas' },
+            { code: 'FX', name: 'Suelo (Manos Libres)' },
+          ]
+        } else if (normClub.includes('claude') || normClub.includes('felmer') || normClub.includes('lyc')) {
+          // Cuadrante Viga (BB -> UB -> FX -> VT)
+          gafAppSequence = [
+            { code: 'BB', name: 'Viga de Equilibrio' },
+            { code: 'UB', name: 'Barras Asimétricas' },
+            { code: 'FX', name: 'Suelo (Manos Libres)' },
+            { code: 'VT', name: 'Salto de Caballo' },
+          ]
+        } else if (normClub.includes('olimpo') || normClub.includes('eleve') || normClub.includes('élevé')) {
+          // Cuadrante Asimétricas (UB -> FX -> VT -> BB)
+          gafAppSequence = [
+            { code: 'UB', name: 'Barras Asimétricas' },
+            { code: 'FX', name: 'Suelo (Manos Libres)' },
+            { code: 'VT', name: 'Salto de Caballo' },
+            { code: 'BB', name: 'Viga de Equilibrio' },
+          ]
+        }
+
+        // Horarios estándar para los 4 pasos del circuito GAF (Grupo A: 09:30-11:15 o Grupo B: 15:00-16:45)
+        const isExclusivelyPM = normClub.includes('paillaco')
+        const gafTimeSlots = isExclusivelyPM
+          ? ['15:00 - 15:25', '15:25 - 15:50', '15:50 - 16:15', '16:15 - 16:45']
+          : ['09:30 - 09:55', '09:55 - 10:20', '10:20 - 10:45', '10:45 - 11:15']
+
+        const computedGafSteps: ApparatusStep[] = gafAppSequence.map((app, rotIdx) => ({
           rotationNumber: rotIdx + 1,
           apparatusCode: app.code,
           apparatusName: app.name,
-          estimatedTime: app.time,
+          estimatedTime: gafTimeSlots[rotIdx] || '09:30 - 10:15',
           athletesOrder: gafAthletes.map((ath, aIdx) => ({
             bibNumber: ath.bibNumber,
             fullName: ath.fullName,
@@ -350,15 +403,22 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
         }))
         setGafScheduleSteps(computedGafSteps)
 
-        // Hoja de ruta GAM (Aparatos oficiales masculinos: FX -> PH -> SR -> VT -> PB -> HB)
+        // Hoja de ruta GAM oficial Paillaco 2026:
+        // Horario único: 12:00 a 13:00 hrs.
+        // Aparatos oficiales habilitados: Suelo (FX) y Salto (VT).
+        // (Paralelas PB sólo si compite gimnasta Nivel Libre como Thomas Martínez).
+        const hasNivelLibreGAM = gamAthletes.some((a) =>
+          a.categoryName.toLowerCase().includes('libre') || a.fullName.toLowerCase().includes('thomas')
+        )
+
         const gamApps = [
-          { code: 'FX', name: 'Suelo (Manos Libres)', time: '09:30 - 10:15' },
-          { code: 'PH', name: 'Caballo con Arzones', time: '10:15 - 10:50' },
-          { code: 'SR', name: 'Anillas', time: '10:50 - 11:25' },
-          { code: 'VT', name: 'Salto', time: '11:25 - 12:00' },
-          { code: 'PB', name: 'Barras Paralelas', time: '12:00 - 12:35' },
-          { code: 'HB', name: 'Barra Fija', time: '12:35 - 13:10' },
+          { code: 'FX', name: 'Suelo (Manos Libres)', time: '12:00 - 12:30' },
+          { code: 'VT', name: 'Salto', time: '12:30 - 13:00' },
         ]
+        if (hasNivelLibreGAM) {
+          gamApps.push({ code: 'PB', name: 'Barras Paralelas (Nivel Libre)', time: '13:00 - 13:10' })
+        }
+
         const computedGamSteps: ApparatusStep[] = gamApps.map((app, rotIdx) => ({
           rotationNumber: rotIdx + 1,
           apparatusCode: app.code,
@@ -743,9 +803,11 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
                         Subdivisión ({selectedBranch})
                       </span>
                       <p className="text-2xl font-black text-blue-400">
-                        {currentBranchAthletes[0]?.subdivision || (selectedBranch === 'GAM' ? 'Varones' : 'Subdivisión 1')}
+                        {selectedBranch === 'GAM' ? 'Bloque Varones' : (currentBranchAthletes[0]?.subdivision || 'Subdivisión 1')}
                       </p>
-                      <p className="text-[11px] text-slate-400">Jornada Oficial</p>
+                      <p className="text-[11px] text-slate-400">
+                        {selectedBranch === 'GAM' ? 'Jornada 12:00 a 13:00 hrs' : 'Jornada Oficial GAF'}
+                      </p>
                     </div>
 
                     <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-1">
@@ -753,10 +815,10 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
                         Grupo de Rotación
                       </span>
                       <p className="text-2xl font-black text-indigo-400">
-                        {currentBranchAthletes[0]?.rotationGroup || (selectedBranch === 'GAM' ? 'Grupo GAM' : 'Grupo A')}
+                        {selectedBranch === 'GAM' ? 'Grupo GAM' : (currentBranchAthletes[0]?.rotationGroup || 'Grupo A')}
                       </p>
                       <p className="text-[11px] text-slate-400">
-                        Aparato Inicio: {selectedBranch === 'GAM' ? 'Suelo (FX)' : 'Salto (VT)'}
+                        Aparato Inicio: {selectedBranch === 'GAM' ? 'Suelo (FX)' : (gafScheduleSteps[0]?.apparatusName ? `${gafScheduleSteps[0].apparatusName} (${gafScheduleSteps[0].apparatusCode})` : 'Salto (VT)')}
                       </p>
                     </div>
 
@@ -764,8 +826,12 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
                       <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
                         Hora de Presentación
                       </span>
-                      <p className="text-2xl font-black text-emerald-400">09:00 hrs</p>
-                      <p className="text-[11px] text-slate-400">Desfile de Presentación</p>
+                      <p className="text-2xl font-black text-emerald-400">
+                        {selectedBranch === 'GAM' ? '12:00 hrs' : '09:00 hrs'}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        {selectedBranch === 'GAM' ? 'Desfile 09:00 hrs · Premiación 13:00 hrs' : 'Desfile de Delegaciones'}
+                      </p>
                     </div>
                   </div>
 
@@ -778,8 +844,8 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
                           Hoja de Ruta de Competición & Horarios Estimados por Aparato
                         </h2>
                         <p className="text-xs text-slate-400">
-                          Secuencia oficial de rotaciones olímpicas del club para {selectedBranch === 'GAM' ? 'Varones (GAM)' : 'Damas (GAF)'} · Grupo{' '}
-                          {currentBranchAthletes[0]?.rotationGroup || (selectedBranch === 'GAM' ? 'GAM' : 'A')}
+                          Secuencia oficial de rotaciones del club para {selectedBranch === 'GAM' ? 'Varones (GAM)' : 'Damas (GAF)'} ·{' '}
+                          {selectedBranch === 'GAM' ? 'Bloque Varones (12:00 a 13:00 hrs)' : `Grupo ${currentBranchAthletes[0]?.rotationGroup || 'A'}`}
                         </p>
                       </div>
                       <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold border ${
@@ -788,11 +854,11 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
                           : 'bg-rose-950/80 text-rose-300 border-rose-800'
                       }`}>
                         <Sparkles className="h-3.5 w-3.5" />
-                        {selectedBranch === 'GAM' ? '6 Aparatos Oficiales GAM (Sin GAF)' : '4 Aparatos Oficiales GAF (Sin GAM)'}
+                        {selectedBranch === 'GAM' ? 'Aparatos Oficiales GAM: Suelo y Salto (12:00 a 13:00 hrs)' : '4 Aparatos Oficiales GAF: Salto, Asimétricas, Viga y Suelo'}
                       </span>
                     </div>
 
-                    <div className={`grid grid-cols-1 md:grid-cols-2 ${selectedBranch === 'GAM' ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
+                    <div className={`grid grid-cols-1 md:grid-cols-2 ${selectedBranch === 'GAM' ? 'lg:grid-cols-2 xl:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
                       {currentSteps.map((step) => (
                         <div
                           key={step.rotationNumber}

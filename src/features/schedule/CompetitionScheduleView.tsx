@@ -185,20 +185,50 @@ export const CompetitionScheduleView: React.FC = () => {
         .from('competition_schedules')
         .select('*')
         .eq('championship_id', champId)
-        .order('sort_order', { ascending: true })
+        .order('start_time', { ascending: true })
 
-      if (schedData) {
-        const mappedSched: CompetitionScheduleItem[] = schedData.map((s) => ({
-          id: s.id,
-          championshipId: s.championship_id,
-          timeStart: s.time_start,
-          timeEnd: s.time_end,
-          title: s.title,
-          description: s.description || undefined,
-          categoryNames: s.category_names || undefined,
-          subdivision: s.subdivision || undefined,
-          sortOrder: s.sort_order,
-        }))
+      if (schedData && schedData.length > 0) {
+        const formatTimeStr = (tVal: string | undefined | null) => {
+          if (!tVal) return ''
+          if (tVal.includes('T')) {
+            const d = new Date(tVal)
+            return d.toLocaleTimeString('es-CL', {
+              hour: '2-digit',
+              minute: '2-digit',
+              timeZone: 'America/Santiago',
+              hour12: false,
+            })
+          }
+          return tVal.slice(0, 5)
+        }
+
+        const mappedSched: CompetitionScheduleItem[] = schedData.map((s, sIdx) => {
+          const raw = s as any
+          const tStart = s.time_start
+            ? formatTimeStr(s.time_start)
+            : raw.start_time
+            ? formatTimeStr(raw.start_time)
+            : '08:00'
+          const tEnd = s.time_end
+            ? formatTimeStr(s.time_end)
+            : raw.end_time
+            ? formatTimeStr(raw.end_time)
+            : '09:00'
+          const title = s.title || raw.name || `Actividad ${sIdx + 1}`
+          const desc = s.description || raw.notes || undefined
+
+          return {
+            id: s.id,
+            championshipId: s.championship_id,
+            timeStart: tStart,
+            timeEnd: tEnd,
+            title: title,
+            description: desc,
+            categoryNames: s.category_names || undefined,
+            subdivision: s.subdivision || undefined,
+            sortOrder: s.sort_order ?? sIdx,
+          }
+        })
         setScheduleItems(mappedSched)
       }
 
@@ -283,7 +313,7 @@ export const CompetitionScheduleView: React.FC = () => {
   // Active discipline apparatuses dynamically based on selected modality and subdivision
   const apparatusCodes = useMemo(() => {
     if (scheduleModality === 'GAM' || selectedSubdivision === 'Varones') {
-      return ['FX', 'PH', 'SR', 'VT', 'PB', 'HB']
+      return ['FX', 'VT', 'PB']
     }
     if (scheduleModality === 'GAF') {
       return ['VT', 'UB', 'BB', 'FX']
@@ -291,13 +321,13 @@ export const CompetitionScheduleView: React.FC = () => {
     const hasGAM = filteredAthletes.some((a) => a.discipline === 'GAM' || a.subdivision === 'Varones')
     const hasGAF = filteredAthletes.some((a) => a.discipline === 'GAF' || a.subdivision !== 'Varones')
     if (hasGAM && !hasGAF) {
-      return ['FX', 'PH', 'SR', 'VT', 'PB', 'HB']
+      return ['FX', 'VT', 'PB']
     }
     if (hasGAF && !hasGAM) {
       return ['VT', 'UB', 'BB', 'FX']
     }
     // Si conviven ambas ramas en pantalla, mostrar la combinación ordenada de aparatos oficiales
-    return ['VT', 'UB', 'BB', 'FX', 'PH', 'SR', 'PB', 'HB']
+    return ['VT', 'UB', 'BB', 'FX', 'PB']
   }, [scheduleModality, selectedSubdivision, filteredAthletes])
 
   const apparatusNames: Record<string, string> = {
