@@ -36,8 +36,14 @@ import {
   ExternalLink,
   ShieldCheck,
   ArrowLeft,
+  Sparkles,
 } from 'lucide-react'
 import type { Championship } from '@/core/types/championship'
+import {
+  inferModality,
+  isApparatusValidForDiscipline,
+  type ModalityCode,
+} from '@/core/gymnastics/apparatusCatalog'
 
 export interface ClubDelegatesPortalProps {
   onNavigateToPublic?: (slug: string) => void
@@ -84,7 +90,9 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
   const [clubName, setClubName] = useState<string>('')
   const [clubCode, setClubCode] = useState<string>('')
   const [gymnasts, setGymnasts] = useState<ClubGymnastRotation[]>([])
-  const [scheduleSteps, setScheduleSteps] = useState<ApparatusStep[]>([])
+  const [selectedBranch, setSelectedBranch] = useState<ModalityCode>('GAF')
+  const [gafScheduleSteps, setGafScheduleSteps] = useState<ApparatusStep[]>([])
+  const [gamScheduleSteps, setGamScheduleSteps] = useState<ApparatusStep[]>([])
   const [lastUpdated, setLastUpdated] = useState<string>('05/11/2026, 12:30 hrs')
   const notices = [
     'Aviso Técnico: El calentamiento general de la Subdivisión 1 iniciará puntualmente a las 08:30 hrs.',
@@ -237,18 +245,29 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
           // Filtrar rigurosamente solo por el clubId del usuario
           athleteList = rpcData
             .filter((r: any) => r.club_id === clubId || userClubs.some((uc) => uc.id === r.club_id))
-            .map((r: any) => ({
-              registrationId: r.registration_id,
-              gymnastId: r.gymnast_id,
-              fullName: `${r.first_name} ${r.last_name}`,
-              bibNumber: r.bib_number || 101,
-              categoryName: r.category_name || 'FIG Senior',
-              discipline: r.discipline || 'GAF',
-              subdivision: r.subdivision || 'Subdivisión 1',
-              rotationGroup: r.rotation_group || 'Grupo A',
-              startingApparatus: r.starting_apparatus || 'VT',
-              startOrder: r.start_order || 1,
-            }))
+            .map((r: any) => {
+              const gymMod = inferModality({
+                discipline: r.discipline,
+                name: r.category_name,
+                gender: r.gender,
+              })
+              let startingApp = r.starting_apparatus
+              if (!startingApp || !isApparatusValidForDiscipline(gymMod, startingApp)) {
+                startingApp = gymMod === 'GAM' ? 'FX' : 'VT'
+              }
+              return {
+                registrationId: r.registration_id,
+                gymnastId: r.gymnast_id,
+                fullName: `${r.first_name} ${r.last_name}`,
+                bibNumber: r.bib_number || 101,
+                categoryName: r.category_name || (gymMod === 'GAM' ? 'GAM Senior' : 'FIG Senior'),
+                discipline: gymMod,
+                subdivision: r.subdivision || (gymMod === 'GAM' ? 'Varones' : 'Subdivisión 1'),
+                rotationGroup: r.rotation_group || (gymMod === 'GAM' ? 'Grupo GAM' : 'Grupo A'),
+                startingApparatus: startingApp,
+                startOrder: r.start_order || 1,
+              }
+            })
         } else {
           // Consulta directa filtrada estrictamente por club_id
           const { data: directData } = await supabase
@@ -260,7 +279,7 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
               subdivision,
               starting_apparatus,
               start_order,
-              gymnasts ( id, first_name, last_name ),
+              gymnasts ( id, first_name, last_name, gender ),
               categories ( name, discipline )
             `)
             .eq('championship_id', champId)
@@ -271,16 +290,25 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
             athleteList = directData.map((d: any, idx: number) => {
               const gym = d.gymnasts
               const cat = d.categories
+              const gymMod = inferModality({
+                discipline: cat?.discipline,
+                name: cat?.name,
+                gender: gym?.gender,
+              })
+              let startingApp = d.starting_apparatus
+              if (!startingApp || !isApparatusValidForDiscipline(gymMod, startingApp)) {
+                startingApp = gymMod === 'GAM' ? 'FX' : 'VT'
+              }
               return {
                 registrationId: d.id,
                 gymnastId: gym?.id || d.id,
                 fullName: gym ? `${gym.first_name} ${gym.last_name}` : `Gimnasta ${idx + 1}`,
                 bibNumber: d.bib_number || 101 + idx,
-                categoryName: cat?.name || 'FIG Senior',
-                discipline: cat?.discipline || 'GAF',
-                subdivision: d.subdivision || 'Subdivisión 1',
-                rotationGroup: d.rotation_group || 'Grupo A',
-                startingApparatus: d.starting_apparatus || 'VT',
+                categoryName: cat?.name || (gymMod === 'GAM' ? 'GAM Senior' : 'FIG Senior'),
+                discipline: gymMod,
+                subdivision: d.subdivision || (gymMod === 'GAM' ? 'Varones' : 'Subdivisión 1'),
+                rotationGroup: d.rotation_group || (gymMod === 'GAM' ? 'Grupo GAM' : 'Grupo A'),
+                startingApparatus: startingApp,
                 startOrder: d.start_order || idx + 1,
               }
             })
@@ -291,27 +319,58 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
 
         setGymnasts(athleteList)
 
-        // Calcular la hoja de ruta olímpica (Ciclo FIG: VT -> UB -> BB -> FX)
-        const apps = [
+        // Segregación estricta GAM vs GAF para la hoja de ruta olímpica
+        const gafAthletes = athleteList.filter((a) => a.discipline === 'GAF')
+        const gamAthletes = athleteList.filter((a) => a.discipline === 'GAM')
+
+        // Auto-seleccionar rama según gimnastas presentes en el club
+        if (gafAthletes.length === 0 && gamAthletes.length > 0) {
+          setSelectedBranch('GAM')
+        } else {
+          setSelectedBranch('GAF')
+        }
+
+        // Hoja de ruta GAF (4 aparatos oficiales: VT -> UB -> BB -> FX)
+        const gafApps = [
           { code: 'VT', name: 'Salto de Caballo', time: '09:30 - 10:15' },
           { code: 'UB', name: 'Barras Asimétricas', time: '10:15 - 11:00' },
           { code: 'BB', name: 'Viga de Equilibrio', time: '11:00 - 11:45' },
           { code: 'FX', name: 'Suelo (Manos Libres)', time: '11:45 - 12:30' },
         ]
-
-        const steps: ApparatusStep[] = apps.map((app, rotIdx) => ({
+        const computedGafSteps: ApparatusStep[] = gafApps.map((app, rotIdx) => ({
           rotationNumber: rotIdx + 1,
           apparatusCode: app.code,
           apparatusName: app.name,
           estimatedTime: app.time,
-          athletesOrder: athleteList.map((ath, aIdx) => ({
+          athletesOrder: gafAthletes.map((ath, aIdx) => ({
             bibNumber: ath.bibNumber,
             fullName: ath.fullName,
             startOrder: aIdx + 1,
           })),
         }))
+        setGafScheduleSteps(computedGafSteps)
 
-        setScheduleSteps(steps)
+        // Hoja de ruta GAM (Aparatos oficiales masculinos: FX -> PH -> SR -> VT -> PB -> HB)
+        const gamApps = [
+          { code: 'FX', name: 'Suelo (Manos Libres)', time: '09:30 - 10:15' },
+          { code: 'PH', name: 'Caballo con Arzones', time: '10:15 - 10:50' },
+          { code: 'SR', name: 'Anillas', time: '10:50 - 11:25' },
+          { code: 'VT', name: 'Salto', time: '11:25 - 12:00' },
+          { code: 'PB', name: 'Barras Paralelas', time: '12:00 - 12:35' },
+          { code: 'HB', name: 'Barra Fija', time: '12:35 - 13:10' },
+        ]
+        const computedGamSteps: ApparatusStep[] = gamApps.map((app, rotIdx) => ({
+          rotationNumber: rotIdx + 1,
+          apparatusCode: app.code,
+          apparatusName: app.name,
+          estimatedTime: app.time,
+          athletesOrder: gamAthletes.map((ath, aIdx) => ({
+            bibNumber: ath.bibNumber,
+            fullName: ath.fullName,
+            startOrder: aIdx + 1,
+          })),
+        }))
+        setGamScheduleSteps(computedGamSteps)
       } catch (err) {
         console.error('Error cargando rotaciones del club:', err)
       } finally {
@@ -625,105 +684,170 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
           </div>
         ) : (
           <>
-            {/* Métricas Resumen del Club */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Gimnastas Inscritos
-            </span>
-            <p className="text-2xl font-black text-white">{gymnasts.length}</p>
-            <p className="text-[11px] text-slate-400">Total delegación acreditada</p>
-          </div>
+            {/* Métricas Resumen del Club y Segregación GAM / GAF */}
+            {(() => {
+              const gafAthletes = gymnasts.filter((a) => a.discipline === 'GAF')
+              const gamAthletes = gymnasts.filter((a) => a.discipline === 'GAM')
+              const currentSteps = selectedBranch === 'GAM' ? gamScheduleSteps : gafScheduleSteps
+              const currentBranchAthletes = selectedBranch === 'GAM' ? gamAthletes : gafAthletes
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Subdivisión
-            </span>
-            <p className="text-2xl font-black text-blue-400">Subdivisión 1</p>
-            <p className="text-[11px] text-slate-400">Jornada Mañana</p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Grupo de Rotación
-            </span>
-            <p className="text-2xl font-black text-indigo-400">
-              {gymnasts[0]?.rotationGroup || 'Grupo A'}
-            </p>
-            <p className="text-[11px] text-slate-400">Aparato Inicio: Salto (VT)</p>
-          </div>
-
-          <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-              Hora de Presentación
-            </span>
-            <p className="text-2xl font-black text-emerald-400">09:00 hrs</p>
-            <p className="text-[11px] text-slate-400">Desfile de Presentación</p>
-          </div>
-        </div>
-
-        {/* SECCIÓN 1: HOJA DE RUTA OLÍMPICA Y HORARIOS POR APARATO */}
-        <div className="space-y-4">
-          <div>
-            <h2 className="text-lg font-black text-white flex items-center gap-2">
-              <RotateCw className="h-5 w-5 text-blue-400" />
-              Hoja de Ruta de Competición & Horarios Estimados por Aparato
-            </h2>
-            <p className="text-xs text-slate-400">
-              Secuencia oficial de rotaciones olímpicas del club para el Grupo{' '}
-              {gymnasts[0]?.rotationGroup || 'A'}
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {scheduleSteps.map((step) => (
-              <div
-                key={step.rotationNumber}
-                className="rounded-2xl border border-slate-800 bg-slate-950 p-5 space-y-4 shadow-sm relative overflow-hidden"
-              >
-                <div className="flex items-center justify-between border-b border-slate-800 pb-3">
-                  <span className="rounded-md bg-blue-950 border border-blue-800 px-2 py-0.5 text-[10px] font-bold text-blue-300">
-                    Rotación {step.rotationNumber}
-                  </span>
-                  <span className="font-mono text-xs font-bold text-emerald-400">
-                    {step.estimatedTime}
-                  </span>
-                </div>
-
-                <div>
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                    Aparato Asignado
-                  </span>
-                  <h3 className="text-base font-black text-white mt-0.5">
-                    {step.apparatusName} ({step.apparatusCode})
-                  </h3>
-                </div>
-
-                <div className="space-y-2 pt-2 border-t border-slate-800/80">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
-                    Orden de Salida del Club
-                  </span>
-                  <ul className="space-y-1.5">
-                    {step.athletesOrder.map((ath) => (
-                      <li
-                        key={ath.bibNumber}
-                        className="flex items-center justify-between text-xs rounded-lg bg-slate-900/80 px-2.5 py-1.5 border border-slate-800/60"
+              return (
+                <>
+                  {/* Selector de Rama GAM / GAF si el club tiene ambas ramas */}
+                  {gafAthletes.length > 0 && gamAthletes.length > 0 && (
+                    <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-950 border border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBranch('GAF')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                          selectedBranch === 'GAF'
+                            ? 'bg-gradient-to-r from-pink-600 to-rose-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                        }`}
                       >
-                        <span className="font-bold text-white flex items-center gap-1.5">
-                          <span className="text-[10px] text-slate-400">#{ath.startOrder}</span>
-                          {ath.fullName}
+                        <span>Rama Femenina (GAF)</span>
+                        <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-mono font-bold">
+                          {gafAthletes.length}
                         </span>
-                        <span className="font-mono text-[11px] font-bold text-blue-400">
-                          Dorsal {ath.bibNumber}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedBranch('GAM')}
+                        className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+                          selectedBranch === 'GAM'
+                            ? 'bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-sm'
+                            : 'text-slate-400 hover:text-white hover:bg-slate-900'
+                        }`}
+                      >
+                        <span>Rama Masculina (GAM)</span>
+                        <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-mono font-bold">
+                          {gamAthletes.length}
                         </span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
+                      </button>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        Gimnastas Inscritos
+                      </span>
+                      <p className="text-2xl font-black text-white">{gymnasts.length}</p>
+                      <p className="text-[11px] text-slate-400">
+                        {gafAthletes.length} GAF · {gamAthletes.length} GAM
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        Subdivisión ({selectedBranch})
+                      </span>
+                      <p className="text-2xl font-black text-blue-400">
+                        {currentBranchAthletes[0]?.subdivision || (selectedBranch === 'GAM' ? 'Varones' : 'Subdivisión 1')}
+                      </p>
+                      <p className="text-[11px] text-slate-400">Jornada Oficial</p>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        Grupo de Rotación
+                      </span>
+                      <p className="text-2xl font-black text-indigo-400">
+                        {currentBranchAthletes[0]?.rotationGroup || (selectedBranch === 'GAM' ? 'Grupo GAM' : 'Grupo A')}
+                      </p>
+                      <p className="text-[11px] text-slate-400">
+                        Aparato Inicio: {selectedBranch === 'GAM' ? 'Suelo (FX)' : 'Salto (VT)'}
+                      </p>
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-800 bg-slate-950 p-4 space-y-1">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                        Hora de Presentación
+                      </span>
+                      <p className="text-2xl font-black text-emerald-400">09:00 hrs</p>
+                      <p className="text-[11px] text-slate-400">Desfile de Presentación</p>
+                    </div>
+                  </div>
+
+                  {/* SECCIÓN 1: HOJA DE RUTA OLÍMPICA Y HORARIOS POR APARATO */}
+                  <div className="space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div>
+                        <h2 className="text-lg font-black text-white flex items-center gap-2">
+                          <RotateCw className="h-5 w-5 text-blue-400" />
+                          Hoja de Ruta de Competición & Horarios Estimados por Aparato
+                        </h2>
+                        <p className="text-xs text-slate-400">
+                          Secuencia oficial de rotaciones olímpicas del club para {selectedBranch === 'GAM' ? 'Varones (GAM)' : 'Damas (GAF)'} · Grupo{' '}
+                          {currentBranchAthletes[0]?.rotationGroup || (selectedBranch === 'GAM' ? 'GAM' : 'A')}
+                        </p>
+                      </div>
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold border ${
+                        selectedBranch === 'GAM'
+                          ? 'bg-blue-950/80 text-blue-300 border-blue-800'
+                          : 'bg-rose-950/80 text-rose-300 border-rose-800'
+                      }`}>
+                        <Sparkles className="h-3.5 w-3.5" />
+                        {selectedBranch === 'GAM' ? '6 Aparatos Oficiales GAM (Sin GAF)' : '4 Aparatos Oficiales GAF (Sin GAM)'}
+                      </span>
+                    </div>
+
+                    <div className={`grid grid-cols-1 md:grid-cols-2 ${selectedBranch === 'GAM' ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
+                      {currentSteps.map((step) => (
+                        <div
+                          key={step.rotationNumber}
+                          className="rounded-2xl border border-slate-800 bg-slate-950 p-5 space-y-4 shadow-sm relative overflow-hidden"
+                        >
+                          <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                            <span className="rounded-md bg-blue-950 border border-blue-800 px-2 py-0.5 text-[10px] font-bold text-blue-300">
+                              Rotación {step.rotationNumber}
+                            </span>
+                            <span className="font-mono text-xs font-bold text-emerald-400">
+                              {step.estimatedTime}
+                            </span>
+                          </div>
+
+                          <div>
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                              Aparato Asignado
+                            </span>
+                            <h3 className="text-base font-black text-white mt-0.5">
+                              {step.apparatusName} ({step.apparatusCode})
+                            </h3>
+                          </div>
+
+                          <div className="space-y-2 pt-2 border-t border-slate-800/80">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                              Orden de Salida del Club ({step.athletesOrder.length} atletas)
+                            </span>
+                            {step.athletesOrder.length === 0 ? (
+                              <p className="text-xs text-slate-500 italic py-1">Sin atletas asignados a este turno.</p>
+                            ) : (
+                              <ul className="space-y-1.5">
+                                {step.athletesOrder.map((ath) => (
+                                  <li
+                                    key={ath.bibNumber}
+                                    className="flex items-center justify-between text-xs rounded-lg bg-slate-900/80 px-2.5 py-1.5 border border-slate-800/60"
+                                  >
+                                    <span className="font-bold text-white flex items-center gap-1.5">
+                                      <span className="text-[10px] text-slate-400">#{ath.startOrder}</span>
+                                      {ath.fullName}
+                                    </span>
+                                    <span className="font-mono text-[11px] font-bold text-blue-400">
+                                      Dorsal {ath.bibNumber}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )
+            })()}
 
         {/* SECCIÓN 2: NÓMINA DE GIMNASTAS INSCRITOS Y ASIGNACIONES */}
         <div className="rounded-2xl border border-slate-800 bg-slate-950 p-6 space-y-4">
@@ -764,7 +888,18 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
                     </td>
                     <td className="px-4 py-3 font-bold text-white">{gym.fullName}</td>
                     <td className="px-4 py-3 text-slate-300">
-                      {gym.categoryName} ({gym.discipline})
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span>{gym.categoryName}</span>
+                        {gym.discipline === 'GAM' ? (
+                          <span className="rounded bg-blue-950 border border-blue-700/80 px-1.5 py-0.2 text-[9px] font-black text-blue-300">
+                            GAM (Varones)
+                          </span>
+                        ) : (
+                          <span className="rounded bg-rose-950 border border-rose-700/80 px-1.5 py-0.2 text-[9px] font-black text-rose-300">
+                            GAF (Damas)
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span className="rounded bg-slate-800 px-2 py-0.5 text-[10px] font-semibold text-slate-300">
@@ -775,7 +910,11 @@ export const ClubDelegatesPortal: React.FC<ClubDelegatesPortalProps> = ({
                       {gym.rotationGroup}
                     </td>
                     <td className="px-4 py-3 text-center">
-                      <span className="rounded bg-blue-950/80 px-2 py-0.5 text-[10px] font-bold text-blue-300 border border-blue-800">
+                      <span className={`rounded px-2 py-0.5 text-[10px] font-bold border ${
+                        gym.discipline === 'GAM'
+                          ? 'bg-blue-950/80 text-blue-300 border-blue-800'
+                          : 'bg-rose-950/80 text-rose-300 border-rose-800'
+                      }`}>
                         {gym.startingApparatus}
                       </span>
                     </td>

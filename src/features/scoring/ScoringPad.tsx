@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import type { GymnasticsDiscipline } from '@/core/types/championship'
 import { DISCIPLINES_LIST, OFFICIAL_DISCIPLINES } from '@/core/constants/disciplines'
+import { inferModality } from '@/core/gymnastics/apparatusCatalog'
 
 interface ScoringPadProps {
   onScoreSaved?: () => void
@@ -84,7 +85,8 @@ export const ScoringPad: React.FC<ScoringPadProps> = ({ onScoreSaved }) => {
           championship_id,
           gymnasts (
             first_name,
-            last_name
+            last_name,
+            gender
           ),
           clubs (
             name
@@ -100,7 +102,7 @@ export const ScoringPad: React.FC<ScoringPadProps> = ({ onScoreSaved }) => {
 
       if (regsData && regsData.length > 0) {
         const mapped: RegistrationOption[] = (regsData as unknown as Record<string, unknown>[]).map((r) => {
-          const gym = r.gymnasts as { first_name: string; last_name: string } | null
+          const gym = r.gymnasts as { first_name: string; last_name: string; gender?: string } | null
           const club = r.clubs as { name: string } | null
           const cat = r.categories as {
             name: string
@@ -111,7 +113,11 @@ export const ScoringPad: React.FC<ScoringPadProps> = ({ onScoreSaved }) => {
 
           const isOblig = cat?.scoring_regime === 'obligatory'
           const fixedVal = cat?.default_fixed_d_score ? Number(cat.default_fixed_d_score) : 10.0
-          const disc = cat?.discipline || 'GAF'
+          const disc = inferModality({
+            discipline: cat?.discipline,
+            name: cat?.name,
+            gender: gym?.gender,
+          }) as GymnasticsDiscipline
 
           return {
             registrationId: r.id as string,
@@ -340,7 +346,16 @@ export const ScoringPad: React.FC<ScoringPadProps> = ({ onScoreSaved }) => {
           ) : (
             <select
               value={selectedRegId}
-              onChange={(e) => setSelectedRegId(e.target.value)}
+              onChange={(e) => {
+                const newId = e.target.value
+                setSelectedRegId(newId)
+                const chosen = registrations.find((r) => r.registrationId === newId)
+                if (chosen) {
+                  setSelectedDiscipline(chosen.discipline)
+                  setIsObligatory(chosen.scoringRegime === 'obligatory')
+                  setFixedD(chosen.defaultFixedDScore.toString())
+                }
+              }}
               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 focus:border-blue-600 focus:outline-none"
             >
               {filteredRegistrations.map((r) => (

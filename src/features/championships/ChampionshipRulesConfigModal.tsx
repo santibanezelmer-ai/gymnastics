@@ -5,13 +5,20 @@ import type {
   AllAroundCalculationMode,
   AllAroundTieBreakRule,
   TeamTieBreakRule,
+  DisciplineApparatusConfig,
 } from '@/core/types/competitionRules'
 import {
   PRESET_FIG_GAF,
   PRESET_FIG_GAM,
+  PRESET_FIG_DUAL_GAM_GAF,
   PRESET_FORMATIVO_3APP,
   PRESET_ESCOLAR_2APP,
 } from '@/core/types/competitionRules'
+import {
+  getOfficialApparatuses,
+  getDefaultCompetitionOrder,
+  type ModalityCode,
+} from '@/core/gymnastics/apparatusCatalog'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -24,6 +31,9 @@ import {
   AlertCircle,
   X,
   FileCheck,
+  Sparkles,
+  ArrowRight,
+  Layers,
 } from 'lucide-react'
 
 interface ChampionshipRulesConfigModalProps {
@@ -62,8 +72,157 @@ export const ChampionshipRulesConfigModal: React.FC<ChampionshipRulesConfigModal
     }
   })
 
-  const [activeTab, setActiveTab] = useState<'allaround' | 'teams' | 'presets'>('allaround')
+  const [activeTab, setActiveTab] = useState<'apparatus' | 'allaround' | 'teams' | 'presets'>('apparatus')
+  const [selectedModality, setSelectedModality] = useState<ModalityCode>(
+    rules.discipline === 'GAM' ? 'GAM' : 'GAF'
+  )
+  const [selectedCategoryOverride, setSelectedCategoryOverride] = useState<string>('all')
+  const [showSaveConfirm, setShowSaveConfirm] = useState(false)
   const [saveSuccessMsg, setSaveSuccessMsg] = useState<string | null>(null)
+
+  // Modality-specific helper
+  const getEnabledForModality = (mod: ModalityCode): string[] => {
+    if (selectedCategoryOverride !== 'all' && rules.categoryOverrides?.[selectedCategoryOverride]?.enabledApparatuses) {
+      return rules.categoryOverrides[selectedCategoryOverride].enabledApparatuses!
+    }
+    if (mod === 'GAM') {
+      return rules.gamConfig?.enabledApparatuses || (rules.discipline === 'GAM' ? rules.allAroundRules.enabledApparatuses : ['FX', 'PH', 'SR', 'VT', 'PB', 'HB'])
+    }
+    return rules.gafConfig?.enabledApparatuses || (rules.discipline === 'GAF' ? rules.allAroundRules.enabledApparatuses : ['VT', 'UB', 'BB', 'FX'])
+  }
+
+  const getMandatoryForModality = (mod: ModalityCode): string[] => {
+    if (selectedCategoryOverride !== 'all' && rules.categoryOverrides?.[selectedCategoryOverride]?.mandatoryApparatuses) {
+      return rules.categoryOverrides[selectedCategoryOverride].mandatoryApparatuses!
+    }
+    if (mod === 'GAM') {
+      return rules.gamConfig?.mandatoryApparatuses || (rules.discipline === 'GAM' ? rules.allAroundRules.mandatoryApparatuses : ['FX', 'PH', 'SR', 'VT', 'PB', 'HB'])
+    }
+    return rules.gafConfig?.mandatoryApparatuses || (rules.discipline === 'GAF' ? rules.allAroundRules.mandatoryApparatuses : ['VT', 'UB', 'BB', 'FX'])
+  }
+
+  const getCompetitionOrderForModality = (mod: ModalityCode): string[] => {
+    if (selectedCategoryOverride !== 'all' && rules.categoryOverrides?.[selectedCategoryOverride]?.competitionOrder) {
+      return rules.categoryOverrides[selectedCategoryOverride].competitionOrder!
+    }
+    if (mod === 'GAM') {
+      return rules.gamConfig?.competitionOrder || getDefaultCompetitionOrder('GAM')
+    }
+    return rules.gafConfig?.competitionOrder || getDefaultCompetitionOrder('GAF')
+  }
+
+  const handleToggleModalityApparatus = (mod: ModalityCode, code: string) => {
+    if (rules.isLocked) return
+    const current = getEnabledForModality(mod)
+    const next = current.includes(code) ? current.filter((c) => c !== code) : [...current, code]
+
+    if (selectedCategoryOverride !== 'all') {
+      const overrides = { ...(rules.categoryOverrides || {}) }
+      overrides[selectedCategoryOverride] = {
+        ...(overrides[selectedCategoryOverride] || {}),
+        discipline: mod,
+        enabledApparatuses: next,
+      }
+      setRules({ ...rules, categoryOverrides: overrides })
+      return
+    }
+
+    if (mod === 'GAM') {
+      const gamCfg: DisciplineApparatusConfig = {
+        discipline: 'GAM',
+        enabledApparatuses: next,
+        mandatoryApparatuses: (rules.gamConfig?.mandatoryApparatuses || next).filter((c) => next.includes(c)),
+        competitionOrder: rules.gamConfig?.competitionOrder || getDefaultCompetitionOrder('GAM'),
+        computableScoresCount: rules.gamConfig?.computableScoresCount ?? 'all',
+        calculationMode: rules.gamConfig?.calculationMode ?? 'sum_all_enabled',
+        tieBreakRule: rules.gamConfig?.tieBreakRule ?? 'fig_olympic',
+        teamTopNScores: rules.gamConfig?.teamTopNScores ?? 3,
+        teamMinGymnasts: rules.gamConfig?.teamMinGymnasts ?? 3,
+        teamAllowIncomplete: rules.gamConfig?.teamAllowIncomplete ?? true,
+      }
+      setRules({
+        ...rules,
+        gamConfig: gamCfg,
+        allAroundRules: rules.discipline === 'GAM' ? { ...rules.allAroundRules, enabledApparatuses: next } : rules.allAroundRules,
+      })
+    } else {
+      const gafCfg: DisciplineApparatusConfig = {
+        discipline: 'GAF',
+        enabledApparatuses: next,
+        mandatoryApparatuses: (rules.gafConfig?.mandatoryApparatuses || next).filter((c) => next.includes(c)),
+        competitionOrder: rules.gafConfig?.competitionOrder || getDefaultCompetitionOrder('GAF'),
+        computableScoresCount: rules.gafConfig?.computableScoresCount ?? 'all',
+        calculationMode: rules.gafConfig?.calculationMode ?? 'sum_all_enabled',
+        tieBreakRule: rules.gafConfig?.tieBreakRule ?? 'fig_olympic',
+        teamTopNScores: rules.gafConfig?.teamTopNScores ?? 3,
+        teamMinGymnasts: rules.gafConfig?.teamMinGymnasts ?? 3,
+        teamAllowIncomplete: rules.gafConfig?.teamAllowIncomplete ?? true,
+      }
+      setRules({
+        ...rules,
+        gafConfig: gafCfg,
+        allAroundRules: rules.discipline === 'GAF' ? { ...rules.allAroundRules, enabledApparatuses: next } : rules.allAroundRules,
+      })
+    }
+  }
+
+  const handleToggleModalityMandatory = (mod: ModalityCode, code: string) => {
+    if (rules.isLocked) return
+    const current = getMandatoryForModality(mod)
+    const next = current.includes(code) ? current.filter((c) => c !== code) : [...current, code]
+
+    if (selectedCategoryOverride !== 'all') {
+      const overrides = { ...(rules.categoryOverrides || {}) }
+      overrides[selectedCategoryOverride] = {
+        ...(overrides[selectedCategoryOverride] || {}),
+        mandatoryApparatuses: next,
+      }
+      setRules({ ...rules, categoryOverrides: overrides })
+      return
+    }
+
+    if (mod === 'GAM') {
+      setRules({
+        ...rules,
+        gamConfig: {
+          ...(rules.gamConfig || {
+            discipline: 'GAM',
+            enabledApparatuses: ['FX', 'PH', 'SR', 'VT', 'PB', 'HB'],
+            mandatoryApparatuses: [],
+            competitionOrder: getDefaultCompetitionOrder('GAM'),
+            computableScoresCount: 'all',
+            calculationMode: 'sum_all_enabled',
+            tieBreakRule: 'fig_olympic',
+            teamTopNScores: 3,
+            teamMinGymnasts: 3,
+            teamAllowIncomplete: true,
+          }),
+          mandatoryApparatuses: next,
+        },
+        allAroundRules: rules.discipline === 'GAM' ? { ...rules.allAroundRules, mandatoryApparatuses: next } : rules.allAroundRules,
+      })
+    } else {
+      setRules({
+        ...rules,
+        gafConfig: {
+          ...(rules.gafConfig || {
+            discipline: 'GAF',
+            enabledApparatuses: ['VT', 'UB', 'BB', 'FX'],
+            mandatoryApparatuses: [],
+            competitionOrder: getDefaultCompetitionOrder('GAF'),
+            computableScoresCount: 'all',
+            calculationMode: 'sum_all_enabled',
+            tieBreakRule: 'fig_olympic',
+            teamTopNScores: 3,
+            teamMinGymnasts: 3,
+            teamAllowIncomplete: true,
+          }),
+          mandatoryApparatuses: next,
+        },
+        allAroundRules: rules.discipline === 'GAF' ? { ...rules.allAroundRules, mandatoryApparatuses: next } : rules.allAroundRules,
+      })
+    }
+  }
 
   // Aplicar un preset predefinido
   const handleApplyPreset = (preset: ChampionshipCompetitionRules) => {
@@ -105,6 +264,20 @@ export const ChampionshipRulesConfigModal: React.FC<ChampionshipRulesConfigModal
   }
 
   const handleSave = () => {
+    // 1. Validación de al menos un aparato habilitado
+    const gamCount = getEnabledForModality('GAM').length
+    const gafCount = getEnabledForModality('GAF').length
+    if (gamCount === 0 && gafCount === 0) {
+      alert('Error reglamentario: Debe haber al menos un aparato habilitado en la competición.')
+      return
+    }
+
+    // 2. Advertencia y confirmación exigida si hay cambios
+    if (!showSaveConfirm) {
+      setShowSaveConfirm(true)
+      return
+    }
+
     const updated = {
       ...rules,
       championshipId: championship.id,
@@ -114,6 +287,7 @@ export const ChampionshipRulesConfigModal: React.FC<ChampionshipRulesConfigModal
       window.localStorage.setItem(storageKey, JSON.stringify(updated))
     }
     if (onSave) onSave(updated)
+    setShowSaveConfirm(false)
     setSaveSuccessMsg('Configuración reglamentaria guardada correctamente.')
     setTimeout(() => {
       setSaveSuccessMsg(null)
@@ -191,11 +365,23 @@ export const ChampionshipRulesConfigModal: React.FC<ChampionshipRulesConfigModal
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-800 bg-slate-950/60 px-5 gap-2 text-xs font-semibold">
+        <div className="flex border-b border-slate-800 bg-slate-950/60 px-5 gap-2 text-xs font-semibold overflow-x-auto">
+          <button
+            type="button"
+            onClick={() => setActiveTab('apparatus')}
+            className={`py-3 px-3 border-b-2 flex items-center gap-1.5 transition-colors shrink-0 ${
+              activeTab === 'apparatus'
+                ? 'border-indigo-500 text-white font-bold'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Sliders className="h-4 w-4" />
+            <span>Modalidades & Aparatos</span>
+          </button>
           <button
             type="button"
             onClick={() => setActiveTab('allaround')}
-            className={`py-3 px-3 border-b-2 flex items-center gap-1.5 transition-colors ${
+            className={`py-3 px-3 border-b-2 flex items-center gap-1.5 transition-colors shrink-0 ${
               activeTab === 'allaround'
                 ? 'border-indigo-500 text-white font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -207,7 +393,7 @@ export const ChampionshipRulesConfigModal: React.FC<ChampionshipRulesConfigModal
           <button
             type="button"
             onClick={() => setActiveTab('teams')}
-            className={`py-3 px-3 border-b-2 flex items-center gap-1.5 transition-colors ${
+            className={`py-3 px-3 border-b-2 flex items-center gap-1.5 transition-colors shrink-0 ${
               activeTab === 'teams'
                 ? 'border-indigo-500 text-white font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -219,7 +405,7 @@ export const ChampionshipRulesConfigModal: React.FC<ChampionshipRulesConfigModal
           <button
             type="button"
             onClick={() => setActiveTab('presets')}
-            className={`py-3 px-3 border-b-2 flex items-center gap-1.5 transition-colors ${
+            className={`py-3 px-3 border-b-2 flex items-center gap-1.5 transition-colors shrink-0 ${
               activeTab === 'presets'
                 ? 'border-indigo-500 text-white font-bold'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -245,6 +431,176 @@ export const ChampionshipRulesConfigModal: React.FC<ChampionshipRulesConfigModal
               <span>
                 Este campeonato ha oficializado sus actas y sus reglas de competición se encuentran congeladas para proteger la inmutabilidad histórica.
               </span>
+            </div>
+          )}
+
+          {/* TAB 0: MODALIDADES Y APARATOS (FASE 22) */}
+          {activeTab === 'apparatus' && (
+            <div className="space-y-6">
+              {/* Selector de Modalidad GAM / GAF */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-2xl border border-slate-800 bg-slate-950">
+                <div>
+                  <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                    <Sliders className="h-4 w-4 text-indigo-400" />
+                    Modalidad en Configuración
+                  </h4>
+                  <p className="text-xs text-slate-400">
+                    Configura de forma independiente los aparatos para Varones (GAM) y Damas (GAF)
+                  </p>
+                </div>
+                <div className="flex items-center gap-1.5 bg-slate-900 p-1 rounded-xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setSelectedModality('GAM')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      selectedModality === 'GAM'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    GAM — Varones (6 Aparatos)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedModality('GAF')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                      selectedModality === 'GAF'
+                        ? 'bg-pink-600 text-white shadow-xs'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    GAF — Damas (4 Aparatos)
+                  </button>
+                </div>
+              </div>
+
+              {/* Selector de Sobrescritura por Categoría */}
+              <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-800 bg-slate-950/60 text-xs">
+                <span className="text-slate-300 font-semibold flex items-center gap-1.5">
+                  <Layers className="h-4 w-4 text-slate-400" />
+                  Ámbito de Configuración:
+                </span>
+                <select
+                  disabled={rules.isLocked}
+                  value={selectedCategoryOverride}
+                  onChange={(e) => setSelectedCategoryOverride(e.target.value)}
+                  className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-1 text-xs font-semibold text-white focus:outline-none"
+                >
+                  <option value="all">General (Toda la Modalidad {selectedModality})</option>
+                  <option value="formativo">Categorías Formativas / Niveles Usag (3 aparatos)</option>
+                  <option value="iniciacion">Iniciación / Escolar (2 aparatos)</option>
+                </select>
+              </div>
+
+              {/* Alerta si 0 aparatos están habilitados */}
+              {getEnabledForModality(selectedModality).length === 0 && (
+                <div className="flex items-center gap-2 rounded-xl bg-rose-950/80 p-3 text-xs text-rose-300 border border-rose-800">
+                  <AlertCircle className="h-4 w-4 text-rose-400 shrink-0" />
+                  <span>
+                    <strong>Validación Crítica:</strong> Debe haber al menos un aparato habilitado en la modalidad {selectedModality} para poder guardar la configuración.
+                  </span>
+                </div>
+              )}
+
+              {/* Lista Visual de Aparatos Oficiales FIG */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <label className="text-xs font-bold text-slate-200 uppercase tracking-wider">
+                    Aparatos Oficiales FIG — {selectedModality === 'GAM' ? 'Gimnasia Artística Masculina (6)' : 'Gimnasia Artística Femenina (4)'}
+                  </label>
+                  <span className="text-[11px] text-slate-400 font-mono">
+                    {getEnabledForModality(selectedModality).length} de {getOfficialApparatuses(selectedModality).length} habilitados
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {getOfficialApparatuses(selectedModality).map((app, idx) => {
+                    const isEnabled = getEnabledForModality(selectedModality).includes(app.code)
+                    const isMandatory = getMandatoryForModality(selectedModality).includes(app.code)
+                    const orderIndex = getCompetitionOrderForModality(selectedModality).indexOf(app.code) + 1
+
+                    return (
+                      <div
+                        key={app.code}
+                        className={`p-4 rounded-2xl border transition-all ${
+                          isEnabled
+                            ? 'border-indigo-500/60 bg-gradient-to-br from-slate-900 to-indigo-950/20 shadow-xs'
+                            : 'border-slate-800/80 bg-slate-950/40 opacity-60'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-base font-black px-2 py-0.5 rounded-lg bg-slate-800 text-white border border-slate-700">
+                              {app.code}
+                            </span>
+                            <Badge variant="outline" className={`text-[10px] ${selectedModality === 'GAM' ? 'text-blue-400 border-blue-800' : 'text-pink-400 border-pink-800'}`}>
+                              {selectedModality}
+                            </Badge>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={rules.isLocked}
+                            onClick={() => handleToggleModalityApparatus(selectedModality, app.code)}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${
+                              isEnabled
+                                ? 'bg-emerald-600/30 text-emerald-300 border border-emerald-500/40 hover:bg-emerald-600/40'
+                                : 'bg-slate-800 text-slate-400 hover:text-white'
+                            }`}
+                          >
+                            {isEnabled ? '✓ Habilitado' : '✕ Deshabilitado'}
+                          </button>
+                        </div>
+
+                        <div>
+                          <h5 className="text-sm font-bold text-white">{app.name}</h5>
+                          <p className="text-xs text-slate-400 italic">{app.internationalName}</p>
+                        </div>
+
+                        <div className="mt-3 pt-3 border-t border-slate-800/80 space-y-2 text-xs">
+                          {/* Checkbox Obligatorio */}
+                          <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              disabled={rules.isLocked || !isEnabled}
+                              checked={isMandatory}
+                              onChange={() => handleToggleModalityMandatory(selectedModality, app.code)}
+                              className="rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-0"
+                            />
+                            <span className="text-[11px]">Obligatorio para All-Around</span>
+                          </label>
+
+                          {/* Orden de Competición & Detalles */}
+                          <div className="flex items-center justify-between text-[11px] text-slate-400 pt-1">
+                            <span>Orden oficial: <strong className="text-white font-mono">{orderIndex > 0 ? `#${orderIndex}` : `#${idx + 1}`}</strong></span>
+                            <span className="text-emerald-400">Computa All-Around</span>
+                          </div>
+
+                          {app.scoringConfig.hasTwoVaultAttempts && (
+                            <div className="text-[10px] text-amber-400 font-mono bg-amber-950/30 px-2 py-0.5 rounded border border-amber-900/40">
+                              ⚡ Salto: 2 intentos en Finales
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Atajos Rápidos */}
+              <div className="p-4 rounded-2xl border border-slate-800 bg-slate-950/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
+                <span className="text-slate-400">
+                  ¿Deseas sincronizar el orden de competición con el motor de rotaciones olímpicas?
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('allaround')}
+                  className="flex items-center gap-1.5 font-bold text-indigo-400 hover:text-indigo-300"
+                >
+                  <span>Continuar a Reglas All-Around</span>
+                  <ArrowRight className="h-4 w-4" />
+                </button>
+              </div>
             </div>
           )}
 
@@ -512,15 +868,18 @@ export const ChampionshipRulesConfigModal: React.FC<ChampionshipRulesConfigModal
                 <button
                   type="button"
                   disabled={rules.isLocked}
-                  onClick={() => handleApplyPreset(PRESET_FIG_GAF)}
-                  className="p-4 rounded-2xl border border-slate-800 bg-slate-950 hover:border-indigo-500 text-left transition-all"
+                  onClick={() => handleApplyPreset(PRESET_FIG_DUAL_GAM_GAF)}
+                  className="p-4 rounded-2xl border border-indigo-700/60 bg-gradient-to-br from-indigo-950/40 to-slate-950 hover:border-indigo-400 text-left transition-all sm:col-span-2"
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="font-bold text-white text-xs">FIG GAF 2025-2028</span>
-                    <Badge variant="outline" className="text-[10px]">4 Aparatos</Badge>
+                    <span className="font-bold text-white text-xs flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-indigo-400" />
+                      FIG Integral Dual (GAM 6 + GAF 4 Aparatos)
+                    </span>
+                    <Badge variant="outline" className="text-[10px] text-indigo-300 border-indigo-600">GAM + GAF</Badge>
                   </div>
-                  <p className="text-xs text-slate-400">
-                    Reglamento olímpico oficial: Salto, Asimétricas, Viga, Suelo. Top 3 por aparato para equipos.
+                  <p className="text-xs text-slate-300">
+                    Configuración integral oficial para torneos combinados como Paillaco 2026: 6 aparatos para Varones y 4 para Damas, calculados con reglas FIG.
                   </p>
                 </button>
 
@@ -572,6 +931,34 @@ export const ChampionshipRulesConfigModal: React.FC<ChampionshipRulesConfigModal
             </div>
           )}
         </div>
+
+        {/* Barra de Confirmación y Advertencia antes de Guardar */}
+        {showSaveConfirm && (
+          <div className="p-4 bg-amber-950/90 border-t border-amber-800 text-xs text-amber-200 flex flex-col sm:flex-row items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-amber-400 shrink-0" />
+              <span>
+                <strong>Advertencia técnica:</strong> Modificar los aparatos habilitados u obligatorios recalculará automáticamente los resultados de All-Around y Equipos. ¿Deseas aplicar estos cambios?
+              </span>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowSaveConfirm(false)}
+                className="px-3 py-1.5 rounded-lg border border-slate-700 bg-slate-900 text-slate-300 font-bold hover:bg-slate-800"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="px-3 py-1.5 rounded-lg bg-amber-600 text-white font-bold hover:bg-amber-500 shadow-xs cursor-pointer"
+              >
+                Sí, Confirmar y Guardar
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Modal Footer */}
         <div className="border-t border-slate-800 bg-slate-950 p-4 flex flex-col sm:flex-row items-center justify-between gap-3">

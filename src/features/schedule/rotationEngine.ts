@@ -9,6 +9,13 @@
  * Desarrollado por Comercial Hels SpA para Operix Gymnastics.
  */
 
+import {
+  getDefaultCompetitionOrder,
+  inferModality,
+  isApparatusValidForDiscipline,
+  type ModalityCode,
+} from '@/core/gymnastics/apparatusCatalog'
+
 export interface MarshalingAthlete {
   registrationId: string
   gymnastId: string
@@ -18,6 +25,7 @@ export interface MarshalingAthlete {
   bibNumber?: number
   categoryName?: string
   subdivision?: string
+  discipline?: ModalityCode
   rotationGroup: string
   startingApparatus: string
   startOrder: number
@@ -84,6 +92,62 @@ export function generateOlympicRotationMatrix(
 }
 
 /**
+ * Generates an Olympic rotation matrix for a specific modality (GAM or GAF)
+ * using its official standard sequence or a custom configured apparatus order.
+ */
+export function generateModalityRotationMatrix(
+  discipline: ModalityCode,
+  groupNames: string[],
+  customOrder?: string[]
+): GroupRotationSchedule[] {
+  const codes = customOrder && customOrder.length > 0 ? customOrder : getDefaultCompetitionOrder(discipline)
+  return generateOlympicRotationMatrix(groupNames, codes)
+}
+
+/**
+ * Validates that athlete starting apparatuses belong exclusively to their modality
+ * and are among the enabled apparatuses for the category/competition.
+ */
+export function validateRotationAssignment(
+  discipline: ModalityCode,
+  athletes: MarshalingAthlete[],
+  enabledApparatuses: string[]
+): {
+  isValid: boolean
+  invalidAssignments: { athleteName: string; apparatus: string }[]
+  errors: string[]
+} {
+  const invalidAssignments: { athleteName: string; apparatus: string }[] = []
+  const errors: string[] = []
+
+  for (const ath of athletes) {
+    const targetApp = ath.startingApparatus || (ath as any).currentApparatus
+    const athName = ath.gymnastName || (ath as any).name || ath.registrationId || 'Atleta'
+    if (!targetApp) continue
+
+    if (!isApparatusValidForDiscipline(discipline, targetApp)) {
+      invalidAssignments.push({
+        athleteName: athName,
+        apparatus: targetApp,
+      })
+      errors.push(`Atleta ${athName} asignado a aparato "${targetApp}" incompatible con ${discipline}.`)
+    } else if (enabledApparatuses.length > 0 && !enabledApparatuses.includes(targetApp)) {
+      invalidAssignments.push({
+        athleteName: athName,
+        apparatus: targetApp,
+      })
+      errors.push(`Atleta ${athName} asignado a aparato "${targetApp}" no habilitado para la competencia.`)
+    }
+  }
+
+  return {
+    isValid: invalidAssignments.length === 0,
+    invalidAssignments,
+    errors,
+  }
+}
+
+/**
  * Filters and orders the athletes who are currently scheduled at a specific apparatus
  * for the active rotation number.
  */
@@ -95,6 +159,13 @@ export function getAthletesAtApparatusForRotation(
 ): MarshalingAthlete[] {
   return athletes
     .filter((ath) => {
+      // Regla estricta FIG: Un gimnasta masculino (GAM) jamás puede competir en aparatos exclusivos de GAF (UB, BB),
+      // y una gimnasta femenina jamás puede competir en aparatos exclusivos de GAM (PH, SR, PB, HB).
+      const athMod = ath.discipline || inferModality({ name: ath.categoryName })
+      if (!isApparatusValidForDiscipline(athMod, targetApparatusCode)) {
+        return false
+      }
+
       const startingIndex = apparatusCodes.indexOf(ath.startingApparatus)
       const validStartingIndex = startingIndex >= 0 ? startingIndex : 0
       const currentApp = getApparatusForRotation(apparatusCodes, validStartingIndex, rotationNumber)
@@ -227,6 +298,12 @@ export function autoAssignRotationGroups(
     const startingApp = apparatusCodes[groupIdx % numApparatuses]
 
     bucket.forEach((ath, athIdx) => {
+      const athMod: ModalityCode = (ath as any).discipline || inferModality({ name: ath.categoryName })
+      let safeStartingApp = startingApp
+      if (!isApparatusValidForDiscipline(athMod, safeStartingApp)) {
+        safeStartingApp = athMod === 'GAM' ? 'FX' : 'VT'
+      }
+
       result.push({
         registrationId: ath.registrationId,
         gymnastId: ath.gymnastId,
@@ -235,9 +312,10 @@ export function autoAssignRotationGroups(
         clubName: ath.clubName,
         bibNumber: globalBib++,
         categoryName: ath.categoryName,
+        discipline: athMod,
         subdivision: subdivisionName,
         rotationGroup: groupName,
-        startingApparatus: startingApp,
+        startingApparatus: safeStartingApp,
         startOrder: athIdx + 1,
       })
     })

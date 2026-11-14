@@ -21,6 +21,9 @@ import { supabase } from '@/lib/supabase/client'
 import { Badge } from '@/components/ui/badge'
 import { PublicAthletesRoster } from './PublicAthletesRoster'
 import {
+  getApparatusLabel,
+} from '@/core/gymnastics/apparatusCatalog'
+import {
   Trophy,
   Calendar,
   MapPin,
@@ -77,6 +80,9 @@ export interface PublishedResultItem {
   gymnastName: string
   clubName: string
   categoryName: string
+  subcategoryId?: string
+  discipline?: string
+  apparatusCode?: string
   finalScore: number
 }
 
@@ -96,6 +102,11 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
   const [publishedResults, setPublishedResults] = useState<PublishedResultItem[]>([])
   const [allChampionships, setAllChampionships] = useState<Championship[]>([])
   const [currentSlug, setCurrentSlug] = useState<string>(slug)
+
+  // Filtros de Resultados y Modalidad (Fase 22)
+  const [resultsModality, setResultsModality] = useState<'all' | 'GAM' | 'GAF'>('all')
+  const [resultsViewType, setResultsViewType] = useState<'all_around' | 'apparatus' | 'teams'>('all_around')
+  const [selectedApparatus, setSelectedApparatus] = useState<string>('VT')
 
   // 1. Cargar datos del campeonato por slug
   useEffect(() => {
@@ -790,10 +801,10 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
               </div>
             )}
 
-            {/* 3. RESULTADOS OFICIALES PUBLICADOS */}
+            {/* 3. RESULTADOS OFICIALES PUBLICADOS (FASE 22) */}
             {activeTab === 'results' && (
               <div className="space-y-6">
-                <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 space-y-4">
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-6 space-y-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h2 className="text-lg font-black text-white flex items-center gap-2">
@@ -808,6 +819,109 @@ export const PublicChampionshipPortal: React.FC<PublicChampionshipPortalProps> =
                       ✓ Certificado Oficial
                     </span>
                   </div>
+
+                  {/* Barra de Filtros Deportivos: Modalidad GAM/GAF y Tipo de Clasificación */}
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-3 border-t border-slate-800">
+                    {/* Selector de Modalidad GAM / GAF */}
+                    <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setResultsModality('all')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          resultsModality === 'all'
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Todas
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setResultsModality('GAM')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          resultsModality === 'GAM'
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        GAM (Varones)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setResultsModality('GAF')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          resultsModality === 'GAF'
+                            ? 'bg-pink-600 text-white shadow-xs'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        GAF (Damas)
+                      </button>
+                    </div>
+
+                    {/* Selector Tipo de Clasificación */}
+                    <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800">
+                      <button
+                        type="button"
+                        onClick={() => setResultsViewType('all_around')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          resultsViewType === 'all_around'
+                            ? 'bg-slate-800 text-white shadow-xs'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        All-Around
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setResultsViewType('apparatus')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          resultsViewType === 'apparatus'
+                            ? 'bg-slate-800 text-white shadow-xs'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Por Aparato
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setResultsViewType('teams')}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          resultsViewType === 'teams'
+                            ? 'bg-slate-800 text-white shadow-xs'
+                            : 'text-slate-400 hover:text-white'
+                        }`}
+                      >
+                        Equipos
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Selector de Aparatos si vista por aparato está seleccionada */}
+                  {resultsViewType === 'apparatus' && (
+                    <div className="flex items-center gap-2 flex-wrap p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                      <span className="text-xs font-bold text-slate-400 mr-1">Aparato:</span>
+                      {(resultsModality === 'GAM'
+                        ? ['FX', 'PH', 'SR', 'VT', 'PB', 'HB']
+                        : resultsModality === 'GAF'
+                        ? ['VT', 'UB', 'BB', 'FX']
+                        : ['VT', 'UB', 'BB', 'FX', 'PH', 'SR', 'PB', 'HB']
+                      ).map((code) => (
+                        <button
+                          key={code}
+                          type="button"
+                          onClick={() => setSelectedApparatus(code)}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition-all ${
+                            selectedApparatus === code
+                              ? 'bg-orange-500 text-slate-950 shadow-xs scale-102 font-black'
+                              : 'bg-slate-900 border border-slate-800 text-slate-300 hover:text-white'
+                          }`}
+                        >
+                          {code} • {getApparatusLabel(code, resultsModality === 'all' ? undefined : resultsModality)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   {/* Tabla resumen pública o estado de espera */}
                   {publishedResults.length === 0 ? (

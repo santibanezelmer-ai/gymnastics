@@ -64,6 +64,12 @@ export interface AllAroundRulesConfig {
 
   /** Tratamiento reglamentario para ausencias no justificadas (DNS) */
   treatmentOfAbsent: 'exclude' | 'zero_score'
+
+  /** Permite emitir resultados provisionales/parciales mientras la rotación está en curso */
+  allowPartialResults?: boolean
+
+  /** Exige todos los aparatos para acceder a podio y medallas */
+  requireAllForPodium?: boolean
 }
 
 // ============================================================================
@@ -150,8 +156,21 @@ export interface AthleteParticipationProfile {
 }
 
 // ============================================================================
-// 4. CONFIGURACIÓN COMPLETA DEL CAMPEONATO
+// 4. CONFIGURACIÓN COMPLETA DEL CAMPEONATO Y MODALIDADES GAM / GAF
 // ============================================================================
+
+export interface DisciplineApparatusConfig {
+  discipline: 'GAM' | 'GAF'
+  enabledApparatuses: string[]
+  mandatoryApparatuses: string[]
+  competitionOrder: string[]
+  computableScoresCount: number | 'all'
+  calculationMode: AllAroundCalculationMode
+  tieBreakRule: AllAroundTieBreakRule
+  teamTopNScores: number
+  teamMinGymnasts: number
+  teamAllowIncomplete: boolean
+}
 
 export interface ChampionshipCompetitionRules {
   championshipId: string
@@ -160,10 +179,18 @@ export interface ChampionshipCompetitionRules {
   discipline: GymnasticsDiscipline
   allAroundRules: AllAroundRulesConfig
   teamRules: TeamRulesConfig
+  /** Configuración específica para Gimnasia Artística Masculina (GAM) */
+  gamConfig?: DisciplineApparatusConfig
+  /** Configuración específica para Gimnasia Artística Femenina (GAF) */
+  gafConfig?: DisciplineApparatusConfig
   /** Reglas específicas que sobreescriben a nivel de categoría (ej. Categoría Iniciación vs Nivel Libre) */
   categoryOverrides?: Record<
     string,
     {
+      discipline?: 'GAM' | 'GAF'
+      enabledApparatuses?: string[]
+      mandatoryApparatuses?: string[]
+      competitionOrder?: string[]
       allAroundRules?: Partial<AllAroundRulesConfig>
       teamRules?: Partial<TeamRulesConfig>
     }
@@ -206,6 +233,18 @@ export const PRESET_FIG_GAF: ChampionshipCompetitionRules = {
     mandatoryTeamApparatuses: [],
     tieBreakRule: 'fig_team',
   },
+  gafConfig: {
+    discipline: 'GAF',
+    enabledApparatuses: ['VT', 'UB', 'BB', 'FX'],
+    mandatoryApparatuses: ['VT', 'UB', 'BB', 'FX'],
+    competitionOrder: ['VT', 'UB', 'BB', 'FX'],
+    computableScoresCount: 'all',
+    calculationMode: 'sum_all_enabled',
+    tieBreakRule: 'fig_olympic',
+    teamTopNScores: 3,
+    teamMinGymnasts: 3,
+    teamAllowIncomplete: true,
+  },
   isLocked: false,
   updatedAt: new Date().toISOString(),
 }
@@ -237,6 +276,74 @@ export const PRESET_FIG_GAM: ChampionshipCompetitionRules = {
     allowIncompleteTeams: true,
     mandatoryTeamApparatuses: [],
     tieBreakRule: 'fig_team',
+  },
+  gamConfig: {
+    discipline: 'GAM',
+    enabledApparatuses: ['FX', 'PH', 'SR', 'VT', 'PB', 'HB'],
+    mandatoryApparatuses: ['FX', 'PH', 'SR', 'VT', 'PB', 'HB'],
+    competitionOrder: ['FX', 'PH', 'SR', 'VT', 'PB', 'HB'],
+    computableScoresCount: 'all',
+    calculationMode: 'sum_all_enabled',
+    tieBreakRule: 'fig_olympic',
+    teamTopNScores: 3,
+    teamMinGymnasts: 3,
+    teamAllowIncomplete: true,
+  },
+  isLocked: false,
+  updatedAt: new Date().toISOString(),
+}
+
+/**
+ * FIG Dual GAM / GAF Estándar (Campeonato Integral):
+ * GAM (6 aparatos: FX, PH, SR, VT, PB, HB) y GAF (4 aparatos: VT, UB, BB, FX).
+ */
+export const PRESET_FIG_DUAL_GAM_GAF: ChampionshipCompetitionRules = {
+  championshipId: '',
+  rulesetCode: 'FIG_DUAL_GAM_GAF_2026',
+  rulesetName: 'FIG Integral (GAM 6 Aparatos + GAF 4 Aparatos)',
+  discipline: 'GAF',
+  allAroundRules: {
+    enabledApparatuses: ['VT', 'UB', 'BB', 'FX'],
+    mandatoryApparatuses: ['VT', 'UB', 'BB', 'FX'],
+    minApparatusesRequired: 4,
+    computableScoresCount: 'all',
+    calculationMode: 'sum_all_enabled',
+    tieBreakRule: 'fig_olympic',
+    treatmentOfWithdrawn: 'exclude_from_all_around',
+    treatmentOfDisqualified: 'strip_all_scores',
+    treatmentOfAbsent: 'exclude',
+  },
+  teamRules: {
+    teamScoringMode: 'top_n_per_apparatus',
+    topNScoresPerApparatus: 3,
+    minGymnastsPerTeam: 3,
+    allowIncompleteTeams: true,
+    mandatoryTeamApparatuses: [],
+    tieBreakRule: 'fig_team',
+  },
+  gafConfig: {
+    discipline: 'GAF',
+    enabledApparatuses: ['VT', 'UB', 'BB', 'FX'],
+    mandatoryApparatuses: ['VT', 'UB', 'BB', 'FX'],
+    competitionOrder: ['VT', 'UB', 'BB', 'FX'],
+    computableScoresCount: 'all',
+    calculationMode: 'sum_all_enabled',
+    tieBreakRule: 'fig_olympic',
+    teamTopNScores: 3,
+    teamMinGymnasts: 3,
+    teamAllowIncomplete: true,
+  },
+  gamConfig: {
+    discipline: 'GAM',
+    enabledApparatuses: ['FX', 'PH', 'SR', 'VT', 'PB', 'HB'],
+    mandatoryApparatuses: ['FX', 'PH', 'SR', 'VT', 'PB', 'HB'],
+    competitionOrder: ['FX', 'PH', 'SR', 'VT', 'PB', 'HB'],
+    computableScoresCount: 'all',
+    calculationMode: 'sum_all_enabled',
+    tieBreakRule: 'fig_olympic',
+    teamTopNScores: 3,
+    teamMinGymnasts: 3,
+    teamAllowIncomplete: true,
   },
   isLocked: false,
   updatedAt: new Date().toISOString(),

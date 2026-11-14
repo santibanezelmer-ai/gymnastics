@@ -35,6 +35,10 @@ import {
   autoAssignRotationGroups,
   type MarshalingAthlete,
 } from './rotationEngine'
+import {
+  inferModality,
+  type ModalityCode,
+} from '@/core/gymnastics/apparatusCatalog'
 
 export const CompetitionScheduleView: React.FC = () => {
   const { user, profile } = useAuth()
@@ -45,6 +49,7 @@ export const CompetitionScheduleView: React.FC = () => {
   // Realtime Marshaling State
   const [currentRotation, setCurrentRotation] = useState<number>(1)
   const [selectedSubdivision, setSelectedSubdivision] = useState<string>('Todas')
+  const [scheduleModality, setScheduleModality] = useState<'ALL' | 'GAF' | 'GAM'>('ALL')
   const [athletes, setAthletes] = useState<MarshalingAthlete[]>([])
   const [apparatusLiveMap, setApparatusLiveMap] = useState<Record<string, string>>({}) // apparatusCode -> currentRegistrationId
   const [isTvFullscreen, setIsTvFullscreen] = useState(false)
@@ -114,7 +119,8 @@ export const CompetitionScheduleView: React.FC = () => {
           gymnasts (
             id,
             first_name,
-            last_name
+            last_name,
+            gender
           ),
           clubs (
             id,
@@ -130,16 +136,31 @@ export const CompetitionScheduleView: React.FC = () => {
 
       if (regData) {
         const mapped: MarshalingAthlete[] = (regData as unknown as Record<string, unknown>[]).map((r, idx) => {
-          const gym = r.gymnasts as { id: string; first_name: string; last_name: string } | null
+          const gym = r.gymnasts as { id: string; first_name: string; last_name: string; gender?: string } | null
           const club = r.clubs as { id: string; name: string } | null
           const cat = r.categories as { name: string; discipline?: string } | null
 
-          const isGAM = (r.subdivision === 'Varones') || (cat?.discipline === 'GAM')
+          const gymMod = inferModality({
+            discipline: cat?.discipline,
+            name: cat?.name,
+            gender: gym?.gender,
+          })
+          const isGAM = (r.subdivision === 'Varones') || gymMod === 'GAM'
+          const disc: ModalityCode = isGAM ? 'GAM' : 'GAF'
           const defaultApps = isGAM
             ? ['FX', 'PH', 'SR', 'VT', 'PB', 'HB']
             : ['VT', 'UB', 'BB', 'FX']
-          const rotGroup = (r.rotation_group as string) || `Grupo ${String.fromCharCode(65 + (idx % defaultApps.length))}`
-          const startApp = (r.starting_apparatus as string) || defaultApps[idx % defaultApps.length]
+          const rotGroup = (r.rotation_group as string) || (isGAM ? 'Grupo GAM' : `Grupo ${String.fromCharCode(65 + (idx % defaultApps.length))}`)
+          let startApp = (r.starting_apparatus as string) || defaultApps[idx % defaultApps.length]
+
+          // Sanitización estricta: un varón jamás puede tener UB o BB
+          if (isGAM && (startApp === 'UB' || startApp === 'BB')) {
+            startApp = 'FX'
+          }
+          // Una dama jamás puede tener PH, SR, PB, HB
+          if (!isGAM && ['PH', 'SR', 'PB', 'HB'].includes(startApp)) {
+            startApp = 'VT'
+          }
 
           return {
             registrationId: r.id as string,
@@ -148,8 +169,9 @@ export const CompetitionScheduleView: React.FC = () => {
             clubId: club?.id || 'c-default',
             clubName: club?.name || 'Club Participante',
             bibNumber: (r.bib_number as number) || 101 + idx,
-            categoryName: cat?.name || 'General',
-            subdivision: (r.subdivision as string) || 'Subdivisión 1',
+            categoryName: cat?.name || (isGAM ? 'GAM General' : 'General'),
+            discipline: disc,
+            subdivision: (r.subdivision as string) || (isGAM ? 'Varones' : 'Subdivisión 1'),
             rotationGroup: rotGroup,
             startingApparatus: startApp,
             startOrder: (r.start_order as number) || (idx % 6) + 1,
@@ -246,24 +268,37 @@ export const CompetitionScheduleView: React.FC = () => {
   // Current championship object
   const currentChamp = championships.find((c) => c.id === selectedChampId)
 
-  // Filtered athletes by subdivision
+  // Filtered athletes by subdivision and modality
   const filteredAthletes = useMemo(() => {
-    if (selectedSubdivision === 'Todas') return athletes
-    return athletes.filter((a) => a.subdivision === selectedSubdivision)
-  }, [athletes, selectedSubdivision])
+    let list = athletes
+    if (selectedSubdivision !== 'Todas') {
+      list = list.filter((a) => a.subdivision === selectedSubdivision)
+    }
+    if (scheduleModality !== 'ALL') {
+      list = list.filter((a) => a.discipline === scheduleModality)
+    }
+    return list
+  }, [athletes, selectedSubdivision, scheduleModality])
 
-  // Active discipline apparatuses dynamically based on selected subdivision
+  // Active discipline apparatuses dynamically based on selected modality and subdivision
   const apparatusCodes = useMemo(() => {
-    const isGAM =
-      selectedSubdivision === 'Varones' ||
-      (filteredAthletes.length > 0 &&
-        filteredAthletes.every(
-          (a) => a.subdivision === 'Varones' || a.categoryName?.includes('GAM')
-        ))
-    return isGAM
-      ? ['FX', 'PH', 'SR', 'VT', 'PB', 'HB']
-      : ['VT', 'UB', 'BB', 'FX']
-  }, [selectedSubdivision, filteredAthletes])
+    if (scheduleModality === 'GAM' || selectedSubdivision === 'Varones') {
+      return ['FX', 'PH', 'SR', 'VT', 'PB', 'HB']
+    }
+    if (scheduleModality === 'GAF') {
+      return ['VT', 'UB', 'BB', 'FX']
+    }
+    const hasGAM = filteredAthletes.some((a) => a.discipline === 'GAM' || a.subdivision === 'Varones')
+    const hasGAF = filteredAthletes.some((a) => a.discipline === 'GAF' || a.subdivision !== 'Varones')
+    if (hasGAM && !hasGAF) {
+      return ['FX', 'PH', 'SR', 'VT', 'PB', 'HB']
+    }
+    if (hasGAF && !hasGAM) {
+      return ['VT', 'UB', 'BB', 'FX']
+    }
+    // Si conviven ambas ramas en pantalla, mostrar la combinación ordenada de aparatos oficiales
+    return ['VT', 'UB', 'BB', 'FX', 'PH', 'SR', 'PB', 'HB']
+  }, [scheduleModality, selectedSubdivision, filteredAthletes])
 
   const apparatusNames: Record<string, string> = {
     VT: 'Salto de Caballo / Salto',
@@ -582,20 +617,58 @@ export const CompetitionScheduleView: React.FC = () => {
               </p>
             </div>
 
-            {/* Subdivision Filter */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-semibold text-slate-600">Subdivisión:</span>
-              <select
-                value={selectedSubdivision}
-                onChange={(e) => setSelectedSubdivision(e.target.value)}
-                className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-800"
-              >
-                {subdivisionsList.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
+            {/* Filters: Modality & Subdivision */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setScheduleModality('ALL')}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all ${
+                    scheduleModality === 'ALL'
+                      ? 'bg-white text-slate-900 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Todas
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleModality('GAF')}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all ${
+                    scheduleModality === 'GAF'
+                      ? 'bg-pink-600 text-white shadow-xs'
+                      : 'text-pink-700 hover:text-pink-900'
+                  }`}
+                >
+                  GAF (Damas)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setScheduleModality('GAM')}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all ${
+                    scheduleModality === 'GAM'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'text-blue-700 hover:text-blue-900'
+                  }`}
+                >
+                  GAM (Varones)
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-slate-600">Subdivisión:</span>
+                <select
+                  value={selectedSubdivision}
+                  onChange={(e) => setSelectedSubdivision(e.target.value)}
+                  className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-800"
+                >
+                  {subdivisionsList.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
 

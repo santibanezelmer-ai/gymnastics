@@ -24,6 +24,10 @@ import {
   type GymnastScoreEntry,
 } from './standingsEngine'
 import {
+  getApparatusLabel,
+  inferModality,
+} from '@/core/gymnastics/apparatusCatalog'
+import {
   Trophy,
   Maximize2,
   Minimize2,
@@ -77,6 +81,7 @@ export const ArenaTVDisplay: React.FC<ArenaTVDisplayProps> = ({
   const [gymnastBibMap, setGymnastBibMap] = useState<Map<string, number>>(new Map())
   const [isLoading, setIsLoading] = useState(true)
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [selectedModality, setSelectedModality] = useState<'all' | 'GAM' | 'GAF'>('all')
   const [categoriesList, setCategoriesList] = useState<{ id: string; name: string }[]>([])
   const [selectedApparatus, setSelectedApparatus] = useState<string>('VT')
 
@@ -250,11 +255,17 @@ export const ArenaTVDisplay: React.FC<ArenaTVDisplayProps> = ({
     }
   }, [championshipId, loadOfficialData])
 
-  // Filtrado de puntuaciones por categoría si está seleccionada
+  // Filtrado de puntuaciones por categoría y modalidad si están seleccionadas
   const filteredScores = useMemo(() => {
-    if (selectedCategory === 'all') return scores
-    return scores.filter((s) => s.categoryId === selectedCategory)
-  }, [scores, selectedCategory])
+    return scores.filter((s) => {
+      if (selectedCategory !== 'all' && s.categoryId !== selectedCategory) return false
+      if (selectedModality !== 'all') {
+        const mod = inferModality({ discipline: s.discipline, name: s.categoryName })
+        if (mod !== selectedModality) return false
+      }
+      return true
+    })
+  }, [scores, selectedCategory, selectedModality])
 
   // Cálculos Deportivos según StandingsEngine
   const allAround = useMemo(() => {
@@ -320,6 +331,24 @@ export const ArenaTVDisplay: React.FC<ArenaTVDisplayProps> = ({
     const setCodes = new Set(scores.map((s) => s.apparatusCode))
     return Array.from(setCodes).sort()
   }, [scores])
+
+  // Lista dinámica de aparatos según la modalidad activa (GAM 6 o GAF 4 o Formativo)
+  const activeApparatusList = useMemo(() => {
+    if (selectedModality === 'GAM') {
+      return ['FX', 'PH', 'SR', 'VT', 'PB', 'HB']
+    }
+    if (selectedModality === 'GAF') {
+      return ['VT', 'UB', 'BB', 'FX']
+    }
+    const cat = categoriesList.find((c) => c.id === selectedCategory)
+    if (cat?.name.toUpperCase().includes('GAM')) {
+      return ['FX', 'PH', 'SR', 'VT', 'PB', 'HB']
+    }
+    if (cat?.name.toUpperCase().includes('GAF')) {
+      return ['VT', 'UB', 'BB', 'FX']
+    }
+    return availableApparatusCodes.length > 0 ? availableApparatusCodes : ['VT', 'UB', 'BB', 'FX']
+  }, [selectedModality, selectedCategory, categoriesList, availableApparatusCodes])
 
   // Podio Top 3 de All-Around o Aparato
   const podiumTop3 = useMemo(() => {
@@ -482,6 +511,37 @@ export const ArenaTVDisplay: React.FC<ArenaTVDisplayProps> = ({
             ))}
           </div>
 
+          {/* Selector de Modalidad GAM / GAF */}
+          <div className="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-0.5 text-xs font-bold">
+            <button
+              type="button"
+              onClick={() => setSelectedModality('all')}
+              className={`px-2 py-0.5 rounded text-[11px] ${
+                selectedModality === 'all' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Todas
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedModality('GAM')}
+              className={`px-2 py-0.5 rounded text-[11px] ${
+                selectedModality === 'GAM' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              GAM (Varones)
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelectedModality('GAF')}
+              className={`px-2 py-0.5 rounded text-[11px] ${
+                selectedModality === 'GAF' ? 'bg-pink-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              GAF (Damas)
+            </button>
+          </div>
+
           {/* Filtro de Categoría si hay varias */}
           {categoriesList.length > 1 && (
             <select
@@ -535,10 +595,11 @@ export const ArenaTVDisplay: React.FC<ArenaTVDisplayProps> = ({
                         <th className="py-4 px-4 text-center w-16">Pos</th>
                         <th className="py-4 px-4">Gimnasta</th>
                         <th className="py-4 px-4">Club / Delegación</th>
-                        <th className="py-4 px-4 text-center">Salto (VT)</th>
-                        <th className="py-4 px-4 text-center">Asimétricas (UB)</th>
-                        <th className="py-4 px-4 text-center">Viga (BB)</th>
-                        <th className="py-4 px-4 text-center">Suelo (FX)</th>
+                        {activeApparatusList.map((code) => (
+                          <th key={code} className="py-4 px-4 text-center">
+                            {getApparatusLabel(code, selectedModality === 'all' ? undefined : selectedModality)} ({code})
+                          </th>
+                        ))}
                         <th className="py-4 px-4 text-right">TOTAL ALL-AROUND</th>
                       </tr>
                     </thead>
@@ -580,27 +641,30 @@ export const ArenaTVDisplay: React.FC<ArenaTVDisplayProps> = ({
                               <div className="font-black text-base sm:text-xl text-white">
                                 {row.gymnastName}
                               </div>
-                              {gymnastBibMap.has(row.gymnastId) && (
-                                <span className="text-xs font-mono font-bold text-blue-400">
-                                  Dorsal #{gymnastBibMap.get(row.gymnastId)}
-                                </span>
-                              )}
+                              <div className="flex items-center gap-2 mt-0.5">
+                                {gymnastBibMap.has(row.gymnastId) && (
+                                  <span className="text-xs font-mono font-bold text-blue-400">
+                                    Dorsal #{gymnastBibMap.get(row.gymnastId)}
+                                  </span>
+                                )}
+                                {row.statusNote && (
+                                  <span className="text-[10px] text-amber-400 font-semibold">
+                                    • {row.statusNote}
+                                  </span>
+                                )}
+                              </div>
                             </td>
                             <td className="py-4 px-4 text-sm sm:text-base text-slate-300 font-semibold">
                               {row.clubName}
                             </td>
-                            <td className="py-4 px-4 text-center font-mono font-bold text-base sm:text-lg tabular-nums text-slate-300">
-                              {row.apparatusScores.VT ? row.apparatusScores.VT.toFixed(3) : '-'}
-                            </td>
-                            <td className="py-4 px-4 text-center font-mono font-bold text-base sm:text-lg tabular-nums text-slate-300">
-                              {row.apparatusScores.UB ? row.apparatusScores.UB.toFixed(3) : '-'}
-                            </td>
-                            <td className="py-4 px-4 text-center font-mono font-bold text-base sm:text-lg tabular-nums text-slate-300">
-                              {row.apparatusScores.BB ? row.apparatusScores.BB.toFixed(3) : '-'}
-                            </td>
-                            <td className="py-4 px-4 text-center font-mono font-bold text-base sm:text-lg tabular-nums text-slate-300">
-                              {row.apparatusScores.FX ? row.apparatusScores.FX.toFixed(3) : '-'}
-                            </td>
+                            {activeApparatusList.map((code) => (
+                              <td
+                                key={code}
+                                className="py-4 px-4 text-center font-mono font-bold text-base sm:text-lg tabular-nums text-slate-300"
+                              >
+                                {row.apparatusScores[code] ? row.apparatusScores[code].toFixed(3) : '-'}
+                              </td>
+                            ))}
                             <td className="py-4 px-4 text-right">
                               <span
                                 className={`font-mono font-black text-2xl sm:text-3xl tabular-nums ${
@@ -630,9 +694,9 @@ export const ArenaTVDisplay: React.FC<ArenaTVDisplayProps> = ({
                     </h2>
                   </div>
 
-                  {/* Selector rápido de aparato */}
-                  <div className="flex items-center gap-1.5">
-                    {availableApparatusCodes.map((appCode) => (
+                  {/* Selector rápido de aparato dinámico GAM / GAF */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {activeApparatusList.map((appCode) => (
                       <button
                         key={appCode}
                         type="button"

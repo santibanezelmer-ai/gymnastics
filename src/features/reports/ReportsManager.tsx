@@ -224,14 +224,16 @@ export const ReportsManager: React.FC = () => {
           gymnasts (
             id,
             first_name,
-            last_name
+            last_name,
+            gender
           ),
           clubs (
             id,
             name
           ),
           categories (
-            name
+            name,
+            discipline
           )
         `)
         .eq('championship_id', champId)
@@ -239,9 +241,15 @@ export const ReportsManager: React.FC = () => {
 
       if (regData) {
         const mappedAthletes: MarshalingAthlete[] = (regData as unknown as Record<string, unknown>[]).map((r, idx) => {
-          const gym = r.gymnasts as { id: string; first_name: string; last_name: string } | null
+          const gym = r.gymnasts as { id: string; first_name: string; last_name: string; gender?: string } | null
           const club = r.clubs as { id: string; name: string } | null
-          const cat = r.categories as { name: string } | null
+          const cat = r.categories as { name: string; discipline?: string } | null
+
+          const isGAM = (r.subdivision === 'Varones') || (cat?.discipline === 'GAM') || (cat?.name?.includes('GAM')) || (gym?.gender === 'male')
+          let startApp = (r.starting_apparatus as string) || (isGAM ? 'FX' : 'VT')
+          if (isGAM && (startApp === 'UB' || startApp === 'BB')) {
+            startApp = 'FX'
+          }
 
           return {
             registrationId: r.id as string,
@@ -250,10 +258,11 @@ export const ReportsManager: React.FC = () => {
             clubId: club?.id || 'c-default',
             clubName: club?.name || 'Club Participante',
             bibNumber: (r.bib_number as number) || 101 + idx,
-            categoryName: cat?.name || 'General',
-            subdivision: (r.subdivision as string) || 'Subdivisión 1',
-            rotationGroup: (r.rotation_group as string) || 'Grupo A',
-            startingApparatus: (r.starting_apparatus as string) || 'VT',
+            categoryName: cat?.name || (isGAM ? 'GAM General' : 'General'),
+            discipline: isGAM ? 'GAM' : 'GAF',
+            subdivision: (r.subdivision as string) || (isGAM ? 'Varones' : 'Subdivisión 1'),
+            rotationGroup: (r.rotation_group as string) || (isGAM ? 'Grupo GAM' : 'Grupo A'),
+            startingApparatus: startApp,
             startOrder: (r.start_order as number) || idx + 1,
           }
         })

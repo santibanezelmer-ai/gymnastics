@@ -12,7 +12,13 @@ import type {
   AllAroundRulesConfig,
   TeamRulesConfig,
   AthleteParticipationProfile,
+  ChampionshipCompetitionRules,
 } from '@/core/types/competitionRules'
+import {
+  isApparatusValidForDiscipline,
+  inferModality,
+  type ModalityCode,
+} from '@/core/gymnastics/apparatusCatalog'
 
 export interface GymnastScoreEntry {
   gymnastId: string
@@ -44,6 +50,8 @@ export interface AllAroundStanding {
   clubName: string
   categoryId?: string
   categoryName?: string
+  subcategoryId?: string
+  discipline?: ModalityCode
   apparatusScores: Record<string, number>
   totalScore: number
   totalEScore: number
@@ -51,17 +59,21 @@ export interface AllAroundStanding {
   medal?: 'gold' | 'silver' | 'bronze'
   statusNote?: string
   isEligible?: boolean
+  isComplete?: boolean
 }
 
 export interface ApparatusStanding {
   rank: number
   apparatusCode: string
+  apparatusName?: string
   gymnastId: string
   gymnastName: string
   clubId: string
   clubName: string
   categoryId?: string
   categoryName?: string
+  subcategoryId?: string
+  discipline?: ModalityCode
   dScore: number
   eScoreAvg: number
   aScore?: number
@@ -71,6 +83,8 @@ export interface ApparatusStanding {
   isTimeBased?: boolean
   unit?: string
   tieBreakInfo?: string
+  status?: string
+  totalParticipants?: number
   vaultAttempts?: {
     attempt1?: { dScore: number; eScoreAvg: number; finalScore: number }
     attempt2?: { dScore: number; eScoreAvg: number; finalScore: number }
@@ -85,19 +99,44 @@ export interface TeamStanding {
   totalScore: number
   apparatusTotals: Record<string, number>
   participatingGymnastsCount: number
+  memberCount?: number
+  discipline?: ModalityCode
   tieBreakInfo?: string
   trophy?: '1st' | '2nd' | '3rd'
   isComplete?: boolean
+  isIncomplete?: boolean
   statusNote?: string
 }
 
 export interface AllAroundComputeOptions {
   categoryId?: string
+  subcategoryId?: string
+  clubId?: string
+  discipline?: ModalityCode
   requiredApparatusCount?: number
   rules?: AllAroundRulesConfig
+  championshipRules?: ChampionshipCompetitionRules
   participationProfiles?:
     | Map<string, AthleteParticipationProfile>
     | Record<string, AthleteParticipationProfile>
+  onlyOfficialApproved?: boolean
+}
+
+export interface ApparatusStandingsOptions {
+  categoryId?: string
+  subcategoryId?: string
+  discipline?: ModalityCode
+  clubId?: string
+  onlyOfficialApproved?: boolean
+}
+
+export interface TeamStandingsOptions {
+  categoryId?: string
+  discipline?: ModalityCode
+  participationProfiles?:
+    | Map<string, AthleteParticipationProfile>
+    | Record<string, AthleteParticipationProfile>
+  onlyOfficialApproved?: boolean
 }
 
 /**
@@ -152,8 +191,34 @@ export function computeAllAroundStandings(
 
   // 1. Filter valid scores
   const validScores = scores.filter((s) => {
-    if (s.status !== 'official_approved' && s.status !== 'provisional') return false
+    if (options.onlyOfficialApproved) {
+      if (s.status !== 'official_approved') return false
+    } else {
+      if (s.status !== 'official_approved' && s.status !== 'provisional') return false
+    }
     if (categoryIdFilter && s.categoryId !== categoryIdFilter) return false
+    if (options.clubId && s.clubId !== options.clubId) return false
+
+    // Modal integrity check: Apparatus MUST belong to the discipline
+    const isArtisticApparatus =
+      isApparatusValidForDiscipline('GAM', s.apparatusCode) ||
+      isApparatusValidForDiscipline('GAF', s.apparatusCode)
+
+    if (isArtisticApparatus && (!s.discipline || s.discipline === 'GAM' || s.discipline === 'GAF')) {
+      const targetDiscipline: ModalityCode =
+        options.discipline ||
+        (s.discipline === 'GAM' || s.discipline === 'GAF' ? s.discipline : undefined) ||
+        (rules.enabledApparatuses?.some((a) => ['PH', 'SR', 'PB', 'HB'].includes(a)) ? 'GAM' : undefined) ||
+        (rules.enabledApparatuses?.some((a) => ['UB', 'BB'].includes(a)) ? 'GAF' : undefined) ||
+        inferModality({ discipline: s.discipline, name: s.categoryName })
+
+      if (options.discipline && options.discipline !== targetDiscipline) {
+        return false
+      }
+      if (!isApparatusValidForDiscipline(targetDiscipline, s.apparatusCode)) {
+        return false
+      }
+    }
 
     // Filter by enabled apparatuses if configured
     if (
@@ -186,6 +251,8 @@ export function computeAllAroundStandings(
       clubName: string
       categoryId?: string
       categoryName?: string
+      subcategoryId?: string
+      discipline?: ModalityCode
       apparatusScores: Record<string, number>
       apparatusEScores: Record<string, number>
       statusNote?: string
@@ -206,12 +273,15 @@ export function computeAllAroundStandings(
         statusNote = 'DSQ'
       }
 
+      const scoreModality = inferModality({ discipline: s.discipline, name: s.categoryName })
       gymnastMap.set(s.gymnastId, {
         gymnastName: s.gymnastName,
         clubId: s.clubId,
         clubName: s.clubName,
         categoryId: s.categoryId,
         categoryName: s.categoryName,
+        subcategoryId: (s as any).subcategoryId,
+        discipline: scoreModality,
         apparatusScores: {},
         apparatusEScores: {},
         statusNote,
@@ -233,11 +303,14 @@ export function computeAllAroundStandings(
     clubName: string
     categoryId?: string
     categoryName?: string
+    subcategoryId?: string
+    discipline?: ModalityCode
     apparatusScores: Record<string, number>
     apparatusEScores: Record<string, number>
     totalScore: number
     totalEScore: number
     statusNote?: string
+    isComplete?: boolean
   }[] = []
 
   for (const [gymnastId, data] of gymnastMap.entries()) {
@@ -256,19 +329,24 @@ export function computeAllAroundStandings(
     }
 
     // Check mandatory apparatuses (must have performed all mandatory ones)
-    if (rules.mandatoryApparatuses && rules.mandatoryApparatuses.length > 0) {
-      const missingMandatory = rules.mandatoryApparatuses.some(
-        (app) => data.apparatusScores[app] === undefined
-      )
+    const completedCount = Object.keys(data.apparatusScores).length
+    const missingMandatory =
+      rules.mandatoryApparatuses && rules.mandatoryApparatuses.length > 0
+        ? rules.mandatoryApparatuses.some((app) => data.apparatusScores[app] === undefined)
+        : false
+
+    const hasMissingRequired =
+      rules.minApparatusesRequired > 0 && completedCount < rules.minApparatusesRequired
+
+    const allowPartial = rules.allowPartialResults ?? (options as any).allowPartialResults ?? false
+
+    if (!allowPartial) {
       if (missingMandatory) {
         continue // Ineligible for All-Around
       }
-    }
-
-    // Check minimum required apparatuses count
-    const completedCount = Object.keys(data.apparatusScores).length
-    if (rules.minApparatusesRequired > 0 && completedCount < rules.minApparatusesRequired) {
-      continue // Ineligible for All-Around
+      if (hasMissingRequired) {
+        continue // Ineligible for All-Around
+      }
     }
 
     // Calculate total score based on calculation mode
@@ -324,11 +402,27 @@ export function computeAllAroundStandings(
         ) / 1000
     }
 
+    const targetCount =
+      rules.enabledApparatuses && rules.enabledApparatuses.length > 0
+        ? rules.enabledApparatuses.length
+        : rules.minApparatusesRequired > 0
+        ? rules.minApparatusesRequired
+        : (data.discipline === 'GAM' ? 6 : 4)
+
+    const isComplete = !missingMandatory && !hasMissingRequired && completedCount >= targetCount
+    let effectiveStatusNote = data.statusNote
+    if (!effectiveStatusNote && !isComplete) {
+      const missingCount = Math.max(0, targetCount - completedCount)
+      effectiveStatusNote = `En curso (${completedCount}/${targetCount} aparatos) - Faltan ${missingCount} aparatos`
+    }
+
     eligibleEntries.push({
       gymnastId,
       ...data,
       totalScore,
       totalEScore,
+      statusNote: effectiveStatusNote,
+      isComplete,
     })
   }
 
@@ -465,6 +559,8 @@ export function computeAllAroundStandings(
       clubName: entry.clubName,
       categoryId: entry.categoryId,
       categoryName: entry.categoryName,
+      subcategoryId: (entry as any).subcategoryId,
+      discipline: (entry as any).discipline,
       apparatusScores: entry.apparatusScores,
       totalScore: entry.totalScore,
       totalEScore: entry.totalEScore,
@@ -472,6 +568,7 @@ export function computeAllAroundStandings(
       medal,
       statusNote: entry.statusNote,
       isEligible: true,
+      isComplete: (entry as any).isComplete,
     })
   }
 
@@ -496,14 +593,45 @@ export function computeAllAroundStandings(
 export function computeApparatusStandings(
   scores: GymnastScoreEntry[],
   apparatusCode: string,
-  categoryId?: string
+  categoryIdOrOptions?: string | ApparatusStandingsOptions
 ): ApparatusStanding[] {
-  const filtered = scores.filter(
-    (s) =>
-      s.apparatusCode === apparatusCode &&
-      (s.status === 'official_approved' || s.status === 'provisional') &&
-      (!categoryId || s.categoryId === categoryId)
-  )
+  const options: ApparatusStandingsOptions =
+    typeof categoryIdOrOptions === 'string'
+      ? { categoryId: categoryIdOrOptions }
+      : categoryIdOrOptions || {}
+
+  const categoryId = options.categoryId
+
+  const filtered = scores.filter((s) => {
+    if (s.apparatusCode !== apparatusCode) return false
+    if (options.onlyOfficialApproved) {
+      if (s.status !== 'official_approved') return false
+    } else {
+      if (s.status !== 'official_approved' && s.status !== 'provisional') return false
+    }
+    if (categoryId && s.categoryId !== categoryId) return false
+    if (options.subcategoryId && (s as any).subcategoryId && (s as any).subcategoryId !== options.subcategoryId) return false
+    if (options.clubId && s.clubId !== options.clubId) return false
+
+    // Modal integrity check: Apparatus MUST belong to the athlete's modality
+    const isArtisticApparatus =
+      isApparatusValidForDiscipline('GAM', apparatusCode) ||
+      isApparatusValidForDiscipline('GAF', apparatusCode)
+
+    if (isArtisticApparatus && (!s.discipline || s.discipline === 'GAM' || s.discipline === 'GAF')) {
+      const targetDiscipline: ModalityCode =
+        options.discipline ||
+        (s.discipline === 'GAM' || s.discipline === 'GAF' ? s.discipline : undefined) ||
+        (['PH', 'SR', 'PB', 'HB'].includes(apparatusCode) ? 'GAM' : undefined) ||
+        (['UB', 'BB'].includes(apparatusCode) ? 'GAF' : undefined) ||
+        inferModality({ discipline: s.discipline, name: s.categoryName })
+
+      if (options.discipline && options.discipline !== targetDiscipline) return false
+      if (!isApparatusValidForDiscipline(targetDiscipline, apparatusCode)) return false
+    }
+
+    return true
+  })
 
   let gymnastEntries: {
     gymnastId: string
@@ -608,6 +736,8 @@ export function computeApparatusStandings(
         clubName: entry.clubName,
         categoryId: entry.categoryId,
         categoryName: entry.categoryName,
+        subcategoryId: (entry as any).subcategoryId,
+        discipline: (entry as any).discipline || options.discipline || inferModality({ discipline: (entry as any).discipline, name: entry.categoryName }),
         dScore: entry.dScore,
         eScoreAvg: entry.eScoreAvg,
         aScore: entry.aScore,
@@ -717,6 +847,7 @@ export function computeApparatusStandings(
       unit: isTimeBased ? 's' : 'pts',
       tieBreakInfo,
       medal,
+      totalParticipants: gymnastEntries.length,
     })
   }
 
@@ -725,9 +856,11 @@ export function computeApparatusStandings(
 
 export interface TeamComputeOptions {
   categoryId?: string
+  discipline?: ModalityCode
   participationProfiles?:
     | Map<string, AthleteParticipationProfile>
     | Record<string, AthleteParticipationProfile>
+  onlyOfficialApproved?: boolean
 }
 
 /**
@@ -769,9 +902,30 @@ export function computeTeamStandings(
   }
 
   const valid = scores.filter((s) => {
-    if (s.status !== 'official_approved' && s.status !== 'provisional') return false
+    if (options?.onlyOfficialApproved) {
+      if (s.status !== 'official_approved') return false
+    } else {
+      if (s.status !== 'official_approved' && s.status !== 'provisional') return false
+    }
     if ((s.attemptNumber ?? 1) !== 1) return false
     if (categoryIdFilter && s.categoryId !== categoryIdFilter) return false
+
+    // Modal integrity check: Apparatus MUST belong to the discipline
+    const isArtisticApparatus =
+      isApparatusValidForDiscipline('GAM', s.apparatusCode) ||
+      isApparatusValidForDiscipline('GAF', s.apparatusCode)
+
+    if (isArtisticApparatus && (!s.discipline || s.discipline === 'GAM' || s.discipline === 'GAF')) {
+      const targetDiscipline: ModalityCode =
+        options?.discipline ||
+        (s.discipline === 'GAM' || s.discipline === 'GAF' ? s.discipline : undefined) ||
+        (['PH', 'SR', 'PB', 'HB'].includes(s.apparatusCode) ? 'GAM' : undefined) ||
+        (['UB', 'BB'].includes(s.apparatusCode) ? 'GAF' : undefined) ||
+        inferModality({ discipline: s.discipline, name: s.categoryName })
+
+      if (options?.discipline && options.discipline !== targetDiscipline) return false
+      if (!isApparatusValidForDiscipline(targetDiscipline, s.apparatusCode)) return false
+    }
 
     // Participation checks
     const part = getParticipation(s.gymnastId)
@@ -968,9 +1122,12 @@ export function computeTeamStandings(
       totalScore: entry.totalScore,
       apparatusTotals: entry.apparatusTotals,
       participatingGymnastsCount: entry.participatingGymnastsCount,
+      memberCount: entry.participatingGymnastsCount,
+      discipline: options?.discipline,
       tieBreakInfo,
       trophy,
       isComplete: entry.isComplete,
+      isIncomplete: !entry.isComplete,
       statusNote: entry.statusNote,
     })
   }

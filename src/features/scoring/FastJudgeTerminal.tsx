@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase/client'
 import { calculateFigScore } from './scoringEngine'
+import {
+  isApparatusValidForDiscipline,
+  inferModality,
+  type ModalityCode,
+} from '@/core/gymnastics/apparatusCatalog'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Modal } from '@/components/ui/modal'
@@ -42,6 +47,7 @@ interface LoadedGymnastOption {
   gymnast_name: string
   club_name: string
   category_name: string
+  discipline?: ModalityCode | string
   scoring_regime: 'free' | 'obligatory'
   default_fixed_d_score?: number
 }
@@ -50,6 +56,7 @@ interface LoadedApparatus {
   id: string
   code: string
   name: string
+  discipline?: ModalityCode | string
 }
 
 export const FastJudgeTerminal: React.FC = () => {
@@ -183,7 +190,7 @@ export const FastJudgeTerminal: React.FC = () => {
     }
   }, [])
 
-  // Auto-sync scoring regime when selected gymnast changes
+  // Auto-sync scoring regime and validate apparatus when selected gymnast changes
   useEffect(() => {
     if (!selectedRegId) return
     const gym = gymnasts.find((g) => g.id === selectedRegId)
@@ -191,8 +198,18 @@ export const FastJudgeTerminal: React.FC = () => {
       const isOblig = gym.scoring_regime === 'obligatory'
       setIsObligatory(isOblig)
       setFixedD(gym.default_fixed_d_score?.toString() || '10.0')
+
+      // Modal validation: ensure selected apparatus belongs to gymnast's modality (GAM vs GAF)
+      const gymMod = inferModality({ discipline: gym.discipline, name: gym.category_name })
+      const currentApp = apparatuses.find((a) => a.id === selectedAppId)
+      if (currentApp && !isApparatusValidForDiscipline(gymMod, currentApp.code)) {
+        const validApp = apparatuses.find((a) => isApparatusValidForDiscipline(gymMod, a.code))
+        if (validApp) {
+          setSelectedAppId(validApp.id)
+        }
+      }
     }
-  }, [selectedRegId, gymnasts])
+  }, [selectedRegId, gymnasts, apparatuses, selectedAppId])
 
   // Búsqueda inmediata por Dorsal o Nombre
   const handleSearchBibOrName = useCallback(
@@ -386,7 +403,20 @@ export const FastJudgeTerminal: React.FC = () => {
     setSubmitSuccess(null)
 
     const currentApp = apparatuses.find((a) => a.id === selectedAppId)
+    const currentGym = gymnasts.find((g) => g.id === selectedRegId)
     const isVaultApp = currentApp?.code === 'VT'
+
+    // Strict validation: Reject score submission for incompatible apparatus / modality
+    if (currentGym && currentApp) {
+      const gymMod = inferModality({ discipline: currentGym.discipline, name: currentGym.category_name })
+      if (!isApparatusValidForDiscipline(gymMod, currentApp.code)) {
+        setIsSubmitting(false)
+        setSubmitError(
+          `Aparato incompatible: "${currentApp.name}" (${currentApp.code}) no corresponde a la categoría ${currentGym.category_name} (${gymMod}).`
+        )
+        return
+      }
+    }
 
     try {
       const { error } = await supabase.rpc('submit_fast_judge_score', {
@@ -840,24 +870,42 @@ export const FastJudgeTerminal: React.FC = () => {
           {/* Apparatus & Vault Attempt Selector */}
           <div className="rounded-2xl bg-slate-50 p-4 border border-slate-200 shadow-2xs flex flex-col justify-between">
             <div>
-              <label className="block text-[11px] font-black uppercase tracking-wider text-slate-700 mb-2">
-                Aparato Asignado
-              </label>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+                  Aparato Asignado
+                </label>
+                {(() => {
+                  const currentGym = gymnasts.find((g) => g.id === selectedRegId)
+                  const gymMod = inferModality({ discipline: currentGym?.discipline, name: currentGym?.category_name })
+                  return (
+                    <Badge variant="outline" className={`text-[10px] font-bold ${gymMod === 'GAM' ? 'text-blue-700 border-blue-300 bg-blue-50' : 'text-pink-700 border-pink-300 bg-pink-50'}`}>
+                      Modalidad {gymMod}
+                    </Badge>
+                  )
+                })()}
+              </div>
               <div className="flex gap-1.5 flex-wrap">
-                {apparatuses.map((app) => (
-                  <button
-                    key={app.id}
-                    type="button"
-                    onClick={() => setSelectedAppId(app.id)}
-                    className={`flex-1 min-w-[48px] rounded-xl py-2 text-xs font-black font-mono transition-all shadow-2xs ${
-                      selectedAppId === app.id
-                        ? 'bg-indigo-700 text-white shadow-xs scale-102'
-                        : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
-                    }`}
-                  >
-                    {app.code}
-                  </button>
-                ))}
+                {(() => {
+                  const currentGym = gymnasts.find((g) => g.id === selectedRegId)
+                  const gymMod = inferModality({ discipline: currentGym?.discipline, name: currentGym?.category_name })
+                  const filtered = apparatuses.filter((a) => isApparatusValidForDiscipline(gymMod, a.code))
+                  const list = filtered.length > 0 ? filtered : apparatuses
+
+                  return list.map((app) => (
+                    <button
+                      key={app.id}
+                      type="button"
+                      onClick={() => setSelectedAppId(app.id)}
+                      className={`flex-1 min-w-[48px] rounded-xl py-2 text-xs font-black font-mono transition-all shadow-2xs ${
+                        selectedAppId === app.id
+                          ? 'bg-indigo-700 text-white shadow-xs scale-102 ring-2 ring-indigo-300'
+                          : 'bg-white border border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      {app.code}
+                    </button>
+                  ))
+                })()}
               </div>
             </div>
 
