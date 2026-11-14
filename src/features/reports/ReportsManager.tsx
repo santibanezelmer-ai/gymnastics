@@ -86,7 +86,7 @@ export const ReportsManager: React.FC = () => {
     async function loadChamps() {
       const { data } = await supabase
         .from('championships')
-        .select('*')
+        .select('id, organization_id, name, slug, description, start_date, end_date, location, venue_name, visibility, status, ruleset_version, scoring_schema_version, created_at, updated_at')
         .order('start_date', { ascending: false })
 
       if (data && data.length > 0) {

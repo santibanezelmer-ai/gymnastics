@@ -2,13 +2,13 @@
 -- SEED DE CUENTAS GENÉRICAS PARA CLUBES PARTICIPANTES: PAILLACO 2026
 -- Desarrollado por Comercial Hels SpA
 --
--- Contraseña unificada para todos los clubes: Operix2026!
+-- Requiere configurar SET LOCAL app.seed_club_password antes de ejecutar.
 -- ==============================================================================
 
 DO $$
 DECLARE
   v_org_id UUID := 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
-  v_pw_hash TEXT := crypt('Operix2026!', gen_salt('bf'));
+  v_pw_hash TEXT := crypt(COALESCE(NULLIF(current_setting('app.seed_club_password', true), ''), encode(gen_random_bytes(16), 'hex')), gen_salt('bf'));
   
   -- Record para iterar
   r RECORD;

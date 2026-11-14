@@ -110,16 +110,28 @@ export const ChampionshipsManager: React.FC = () => {
     try {
       setIsLoading(true)
       setErrorMsg(null)
+      let rows: any[] = []
       const { data, error } = await supabase
         .from('championships')
         .select('*')
         .eq('organization_id', activeOrganization.id)
         .order('start_date', { ascending: false })
 
-      if (error) throw error
+      if (error) {
+        // Fallback seguro cuando judge_code/invite_code tienen REVOKE a nivel de columna
+        const { data: safeData, error: safeError } = await supabase
+          .from('championships')
+          .select('id, organization_id, name, slug, description, start_date, end_date, location, venue_name, visibility, status, ruleset_version, scoring_schema_version, bases_url, contact_email, contact_phone, entry_fee_info, banner_url, created_at, updated_at')
+          .eq('organization_id', activeOrganization.id)
+          .order('start_date', { ascending: false })
+        if (safeError) throw safeError
+        rows = safeData || []
+      } else {
+        rows = data || []
+      }
 
       setChampionships(
-        (data || []).map((row) => ({
+        rows.map((row) => ({
           id: row.id,
           organizationId: row.organization_id,
           name: row.name,

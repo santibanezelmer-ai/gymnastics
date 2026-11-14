@@ -35,6 +35,14 @@ function parsePath(pathname: string): RouteState {
     }
   }
 
+  // 1.2 Match /portal-publico -> Portal Público directo del campeonato activo
+  if (cleanPath === '/portal-publico' || cleanPath.startsWith('/portal-publico')) {
+    return {
+      path: '/evento',
+      params: { slug: 'artistica-paillaco-2026' },
+    }
+  }
+
   // 2. Match /club/rotaciones
   if (cleanPath === '/club/rotaciones' || cleanPath.startsWith('/club/rotaciones')) {
     return {
@@ -47,6 +55,22 @@ function parsePath(pathname: string): RouteState {
   if (cleanPath === '/campeonatos' || cleanPath.startsWith('/campeonatos')) {
     return {
       path: '/campeonatos',
+      params: {},
+    }
+  }
+
+  // 4. Match /arena-tv -> /arena
+  if (cleanPath === '/arena-tv' || cleanPath.startsWith('/arena-tv')) {
+    return {
+      path: '/arena',
+      params: {},
+    }
+  }
+
+  // 5. Match /panel -> /ingresar (Panel Administrativo o Login si no hay sesión)
+  if (cleanPath === '/panel' || cleanPath.startsWith('/panel/')) {
+    return {
+      path: '/ingresar',
       params: {},
     }
   }

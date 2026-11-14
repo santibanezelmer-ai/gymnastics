@@ -143,7 +143,7 @@ export const ArenaTVDisplay: React.FC<ArenaTVDisplayProps> = ({
         })
       }
 
-      // 2. Scores oficiales y relaciones
+      // 2. Scores oficiales aprobados y relaciones
       const { data: scoreRows } = await supabase
         .from('scores')
         .select(`
@@ -155,6 +155,7 @@ export const ArenaTVDisplay: React.FC<ArenaTVDisplayProps> = ({
           neutral_deductions,
           final_score,
           attempt_number,
+          status,
           apparatuses (
             code,
             name
@@ -164,11 +165,11 @@ export const ArenaTVDisplay: React.FC<ArenaTVDisplayProps> = ({
             gymnast_id,
             club_id,
             category_id,
+            bib_number,
             gymnasts (
               id,
               first_name,
-              last_name,
-              bib_number
+              last_name
             ),
             clubs (
               id,
@@ -182,6 +183,7 @@ export const ArenaTVDisplay: React.FC<ArenaTVDisplayProps> = ({
           )
         `)
         .eq('championship_id', championshipId)
+        .eq('status', 'official_approved')
 
       if (scoreRows && scoreRows.length > 0) {
         const bibMap = new Map<string, number>()
@@ -195,8 +197,8 @@ export const ArenaTVDisplay: React.FC<ArenaTVDisplayProps> = ({
           const app = row.apparatuses
           const gId = reg?.gymnast_id || row.registration_id
 
-          if (athlete?.bib_number) {
-            bibMap.set(gId, athlete.bib_number)
+          if (reg?.bib_number) {
+            bibMap.set(gId, reg.bib_number)
           }
           if (category?.id && category?.name) {
             catMap.set(category.id, category.name)
@@ -222,6 +224,8 @@ export const ArenaTVDisplay: React.FC<ArenaTVDisplayProps> = ({
         setCategoriesList(
           Array.from(catMap.entries()).map(([id, name]) => ({ id, name }))
         )
+      } else {
+        setScores([])
       }
     } catch (err) {
       console.error('Error cargando datos de Arena TV:', err)
